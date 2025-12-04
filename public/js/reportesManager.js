@@ -250,77 +250,113 @@ class ReportesManager {
         });
     }
 
-    /**
-     * ✅ MÉTODO CORREGIDO: Normalizar datos con búsqueda exhaustiva del tipo
-     */
-    normalizarDatosMantenimientos(mantenimientos) {
-        return mantenimientos.map((m, index) => {
-            console.log('🔍 Procesando mantenimiento para reporte - ID:', m.id, m);
-            
-            // ✅ OBTENER TIPO - Búsqueda exhaustiva
-            let tipo = this.obtenerTipoMantenimiento(m);
-            
-            // ✅ OBTENER UBICACIÓN
-            let ubicacion = 'Ubicación no especificada';
-            if (m.ubicacion_dispositivo) {
-                ubicacion = m.ubicacion_dispositivo;
-            } else if (m.ubicacion) {
-                ubicacion = m.ubicacion;
-            } else if (m.departamento) {
-                ubicacion = m.departamento;
-            } else if (m.nombre_dispositivo && m.nombre_dispositivo !== 'Dispositivo no encontrado') {
-                ubicacion = m.nombre_dispositivo;
-            }
-            
-            // ✅ OBTENER TÉCNICO
-            let tecnico = 'Técnico no asignado';
-            if (m.tecnico) {
-                tecnico = m.tecnico;
-            } else if (m.nombre_tecnico) {
-                tecnico = m.nombre_tecnico;
-            } else if (m.id_usuarios) {
-                tecnico = `Técnico ${m.id_usuarios}`;
-            }
-            
-            // ✅ OBTENER REPUESTOS
-            let repuestos = 'Ninguno';
-            if (m.repuestos) {
-                repuestos = m.repuestos;
-            } else if (m.repuesto_utilizado) {
-                repuestos = m.repuesto_utilizado;
-            } else if (m.id_repuesto) {
-                repuestos = `Repuesto ${m.id_repuesto}`;
-            }
-            
-            // ✅ OBTENER ESTADO
-            let estado = m.estado || 'Completado';
-            // Corregir estados mal escritos
-            if (estado.includes('Entreprise')) estado = 'En Progreso';
-            if (estado.includes('Inclusive')) estado = 'Pendiente';
-            
-            const mantenimientoNormalizado = {
-                id: m.id || index + 1,
-                fecha: m.fecha || new Date().toISOString(),
-                tecnico: tecnico,
-                tipo: tipo, // ✅ AHORA SÍ INCLUYE EL TIPO CORRECTAMENTE
-                ubicacion: ubicacion,
-                estado: estado,
-                descripcion: m.descripcion || 'Mantenimiento realizado',
-                repuestos: repuestos
-            };
-            
-            console.log('✅ Mantenimiento normalizado:', {
-                id: mantenimientoNormalizado.id,
-                tipo: mantenimientoNormalizado.tipo,
-                tecnico: mantenimientoNormalizado.tecnico,
-                ubicacion: mantenimientoNormalizado.ubicacion,
-                estado: mantenimientoNormalizado.estado
-            });
-            
-            return mantenimientoNormalizado;
+/**
+ * ✅ MÉTODO CORREGIDO: Normalizar datos con búsqueda exhaustiva del tipo Y CÓDIGO DE REPUESTO
+ */
+normalizarDatosMantenimientos(mantenimientos) {
+    return mantenimientos.map((m, index) => {
+        console.log('🔍 Procesando mantenimiento para reporte - ID:', m.id, m);
+        
+        // ✅ OBTENER TIPO - Búsqueda exhaustiva
+        let tipo = this.obtenerTipoMantenimiento(m);
+        
+        // ✅ OBTENER UBICACIÓN
+        let ubicacion = 'Ubicación no especificada';
+        if (m.ubicacion_dispositivo) {
+            ubicacion = m.ubicacion_dispositivo;
+        } else if (m.ubicacion) {
+            ubicacion = m.ubicacion;
+        } else if (m.departamento) {
+            ubicacion = m.departamento;
+        } else if (m.nombre_dispositivo && m.nombre_dispositivo !== 'Dispositivo no encontrado') {
+            ubicacion = m.nombre_dispositivo;
+        }
+        
+        // ✅ OBTENER TÉCNICO
+        let tecnico = 'Técnico no asignado';
+        if (m.tecnico) {
+            tecnico = m.tecnico;
+        } else if (m.nombre_tecnico) {
+            tecnico = m.nombre_tecnico;
+        } else if (m.id_usuarios) {
+            tecnico = `Técnico ${m.id_usuarios}`;
+        }
+        
+        // ✅ OBTENER REPUESTOS - MÉTODO CORREGIDO
+        let repuestos = this.obtenerNombreRepuesto(m);
+        
+        // ✅ OBTENER ESTADO
+        let estado = m.estado || 'Completado';
+        // Corregir estados mal escritos
+        if (estado.includes('Entreprise')) estado = 'En Progreso';
+        if (estado.includes('Inclusive')) estado = 'Pendiente';
+        
+        const mantenimientoNormalizado = {
+            id: m.id || index + 1,
+            fecha: m.fecha || new Date().toISOString(),
+            tecnico: tecnico,
+            tipo: tipo,
+            ubicacion: ubicacion,
+            estado: estado,
+            descripcion: m.descripcion || 'Mantenimiento realizado',
+            repuestos: repuestos
+        };
+        
+        console.log('✅ Mantenimiento normalizado:', {
+            id: mantenimientoNormalizado.id,
+            tipo: mantenimientoNormalizado.tipo,
+            tecnico: mantenimientoNormalizado.tecnico,
+            ubicacion: mantenimientoNormalizado.ubicacion,
+            estado: mantenimientoNormalizado.estado,
+            repuestos: mantenimientoNormalizado.repuestos // ✅ AHORA MOSTRARÁ EL CÓDIGO
         });
-    }
+        
+        return mantenimientoNormalizado;
+    });
+}
 
+/**
+ * ✅ NUEVO MÉTODO: Obtener el código/nombre del repuesto utilizado
+ */
+obtenerNombreRepuesto(mantenimiento) {
+    if (!mantenimiento) return 'Ninguno';
+    
+    // Prioridad 1: Nombre del repuesto (campo 'repuesto' de la consulta SQL)
+    if (mantenimiento.repuesto && mantenimiento.repuesto !== 'Sin repuesto') {
+        return mantenimiento.repuesto;
+    }
+    
+    // Prioridad 2: Código del repuesto (si existe en los datos)
+    if (mantenimiento.codigo_repuesto) {
+        return mantenimiento.codigo_repuesto;
+    }
+    
+    // Prioridad 3: Nombre del repuesto en otros campos
+    const camposPosibles = [
+        'nombre_repuesto',
+        'repuesto_nombre',
+        'repuesto_utilizado',
+        'repuestos' // Campo directo
+    ];
+    
+    for (const campo of camposPosibles) {
+        if (mantenimiento[campo] && mantenimiento[campo] !== 'Ninguno') {
+            return mantenimiento[campo];
+        }
+    }
+    
+    // Prioridad 4: Si solo tenemos el ID, buscar el código/descripción
+    if (mantenimiento.id_repuesto) {
+        return `Repuesto ${mantenimiento.id_repuesto}`; // O puedes cambiarlo por el código si lo tienes
+    }
+    
+    // Prioridad 5: Buscar en extendedProps
+    if (mantenimiento.extendedProps && mantenimiento.extendedProps.repuesto) {
+        return mantenimiento.extendedProps.repuesto;
+    }
+    
+    return 'Ninguno';
+}
     /**
      * ✅ MÉTODO MEJORADO: Búsqueda exhaustiva del tipo de mantenimiento
      */

@@ -1925,3 +1925,37 @@
 .table-responsive::-webkit-scrollbar-thumb:hover {
     background: var(--text-light);
 }
+/* Estilos para el selector multi-usuario de asistencias */
+#usuario-selector-container {
+    display: block !important;
+    margin: 15px 0 !important;
+    padding: 12px !important;
+    background: #f8f9fa !important;
+    border-radius: 8px !important;
+    border: 1px solid #dee2e6 !important;
+}
+
+#usuario-asistencia {
+    width: 100% !important;
+    padding: 8px 12px !important;
+    border: 2px solid #3498db !important;
+    border-radius: 4px !important;
+    font-size: 14px !important;
+    background: white !important;
+    color: #333 !important;
+    margin-top: 5px !important;
+}
+
+#usuario-selector-container label {
+    font-weight: bold !important;
+    color: #2c3e50 !important;
+    margin-bottom: 8px !important;
+    display: block !important;
+}
+
+#usuario-selector-container .text-muted {
+    font-size: 12px !important;
+    color: #6c757d !important;
+    margin-top: 5px !important;
+    display: block !important;
+}

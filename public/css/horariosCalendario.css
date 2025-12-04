@@ -1,0 +1,788 @@
+/* Estilos para el calendario de horarios - INTERFAZ COMPACTA */
+.horarios-calendario-container {
+    padding: 20px;
+    background: #f8f9fa;
+    min-height: calc(100vh - 200px);
+}
+
+.controles-calendario {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 20px;
+    align-items: center;
+    flex-wrap: wrap;
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.control-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.control-group label {
+    font-weight: 500;
+    color: #333;
+    font-size: 14px;
+}
+
+.control-select {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: white;
+    font-size: 14px;
+    min-width: 150px;
+}
+
+.acciones-calendario {
+    display: flex;
+    gap: 10px;
+    margin-left: auto;
+}
+
+.btn-success {
+    background-color: #28a745;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    transition: all 0.3s ease;
+}
+
+.btn-success:hover {
+    background-color: #218838;
+    transform: translateY(-1px);
+}
+
+.btn-success.modificado {
+    background-color: #ffc107;
+    color: #212529;
+}
+
+.btn-success.modificado:hover {
+    background-color: #e0a800;
+}
+
+.btn-info {
+    background-color: #17a2b8;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    transition: all 0.3s ease;
+}
+
+.btn-info:hover {
+    background-color: #138496;
+    transform: translateY(-1px);
+}
+
+/* Calendario Grid - INTERFAZ COMPACTA */
+.calendario-container {
+    background: white;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    overflow-x: auto;
+}
+
+.calendario-header-mes {
+    text-align: center;
+    margin-bottom: 20px;
+    padding: 15px;
+    background: linear-gradient(135deg, #667eea 0%, #252675 100%);
+    color: white;
+    border-radius: 8px;
+}
+
+.calendario-header-mes h3 {
+    margin: 0;
+    font-size: 1.5em;
+    font-weight: 600;
+}
+
+.calendario-grid {
+    min-width: 900px; /* Más compacto */
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    overflow: hidden;
+    font-size: 13px; /* Texto más pequeño */
+}
+
+.calendario-header {
+    display: grid;
+    grid-template-columns: 200px repeat(7, 1fr); /* Más espacio para nombres */
+    background: #343a40;
+    color: white;
+}
+
+.header-corner {
+    padding: 12px 8px;
+    font-weight: 600;
+    background: #495057;
+    border-right: 1px solid #dee2e6;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+}
+
+.fechas-header {
+    text-align: center;
+    font-size: 12px;
+}
+
+.dia-header {
+    padding: 8px 4px;
+    text-align: center;
+    font-weight: 600;
+    font-size: 12px;
+    border-right: 1px solid #dee2e6;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 50px; /* Más compacto */
+}
+
+.dia-header.vacio {
+    background: #495057;
+}
+
+.dia-numero {
+    font-size: 1.1em;
+    font-weight: bold;
+    margin-bottom: 2px;
+}
+
+.dia-nombre {
+    font-size: 0.8em;
+    opacity: 0.9;
+}
+
+.dia-header:last-child {
+    border-right: none;
+}
+
+.calendario-fila {
+    display: grid;
+    grid-template-columns: 200px repeat(7, 1fr);
+    border-bottom: 1px solid #dee2e6;
+}
+
+.calendario-fila:last-child {
+    border-bottom: none;
+}
+
+.fila-header {
+    padding: 8px 12px;
+    background: #f8f9fa;
+    font-weight: 600;
+    font-size: 13px;
+    border-right: 1px solid #dee2e6;
+    display: flex;
+    align-items: center;
+    border-left-width: 4px;
+    border-left-style: solid;
+}
+
+.tecnico-nombre {
+    text-align: left;
+    font-weight: 600;
+    color: #495057;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.calendario-celda {
+    border-right: 1px solid #dee2e6;
+    min-height: 50px; /* Más compacto */
+    padding: 4px;
+    background: white;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.calendario-celda:hover {
+    transform: scale(1.02);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    z-index: 1;
+    position: relative;
+}
+
+.calendario-celda.vacio {
+    background: #f1f3f4;
+    border: 1px dashed #dee2e6;
+}
+
+.calendario-celda:last-child {
+    border-right: none;
+}
+
+/* 🔥 NUEVO: Estilos para turnos con colores */
+.turno-manana {
+    background-color: #d1ecf1 !important; /* Azul claro - 5am-12pm */
+    border-left: 3px solid #17a2b8;
+}
+
+.turno-tarde {
+    background-color: #ffeaa7 !important; /* Naranja claro - 3pm-10pm */
+    border-left: 3px solid #ffc107;
+}
+
+.turno-apoyo {
+    background-color: #d4edda !important; /* Verde claro - Apoyo */
+    border-left: 3px solid #28a745;
+}
+
+.turno-noche {
+    background-color: #e9ecef !important; /* Gris claro - Noche */
+    border-left: 3px solid #6c757d;
+}
+
+.turno-descanso {
+    background-color: #f8d7da !important; /* Rojo claro - Descanso */
+    border-left: 3px solid #dc3545;
+}
+
+.turno-vacaciones {
+    background-color: #cce7ff !important; /* Azul muy claro - Vacaciones */
+    border-left: 3px solid #007bff;
+}
+
+/* Select de turnos compacto */
+.turno-select {
+    width: 100%;
+    padding: 6px 4px;
+    border: 1px solid #ced4da;
+    border-radius: 3px;
+    font-size: 11px;
+    background: transparent;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.turno-select:focus {
+    outline: none;
+    border-color: #80bdff;
+    box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
+}
+
+/* Opciones de turno más compactas */
+.turno-select option {
+    font-size: 11px;
+    padding: 4px 2px;
+}
+
+/* Leyenda de colores */
+.leyenda-turnos {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    margin-top: 20px;
+    flex-wrap: wrap;
+}
+
+.leyenda-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+
+.leyenda-color {
+    width: 16px;
+    height: 16px;
+    border-radius: 3px;
+    border: 1px solid #ddd;
+}
+
+/* Modal Técnico */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.5);
+}
+
+.modal-content {
+    background-color: white;
+    margin: 10% auto;
+    padding: 0;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 500px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    animation: modalSlideIn 0.3s ease;
+}
+
+@keyframes modalSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-50px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.modal-header {
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 8px 8px 0 0;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.modal-header h3 {
+    margin: 0;
+    color: #333;
+    font-size: 1.3em;
+}
+
+.modal-body {
+    padding: 20px;
+}
+
+.modal-footer {
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 0 0 8px 8px;
+    border-top: 1px solid #dee2e6;
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+}
+
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 500;
+    color: #333;
+}
+
+.form-control {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
+}
+
+.color-picker {
+    width: 60px;
+    height: 38px;
+    padding: 4px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.close-modal {
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+    color: #aaa;
+    cursor: pointer;
+    line-height: 1;
+    padding: 0 5px;
+}
+
+.close-modal:hover {
+    color: #000;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .controles-calendario {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .acciones-calendario {
+        margin-left: 0;
+        justify-content: stretch;
+    }
+    
+    .acciones-calendario .btn {
+        flex: 1;
+        justify-content: center;
+    }
+    
+    .calendario-celda {
+        min-height: 45px;
+        padding: 3px;
+    }
+    
+    .turno-select {
+        font-size: 10px;
+        padding: 4px 2px;
+    }
+    
+    .dia-header {
+        padding: 6px 2px;
+        font-size: 11px;
+        min-height: 40px;
+    }
+    
+    .fila-header {
+        padding: 6px 8px;
+        font-size: 12px;
+    }
+    
+    .header-corner {
+        padding: 8px 4px;
+        font-size: 11px;
+    }
+}
+
+/* Estados de error */
+.error-calendario {
+    text-align: center;
+    padding: 40px;
+    color: #6c757d;
+}
+
+.error-calendario i {
+    font-size: 3em;
+    margin-bottom: 15px;
+    color: #dc3545;
+}
+
+/* 🔥 NUEVO: Mejoras para la funcionalidad de arrastre */
+.calendario-fila {
+    cursor: move;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.calendario-fila.arrastrando {
+    opacity: 0.6;
+    background-color: #f8f9fa;
+    transform: scale(0.98);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    z-index: 1000;
+}
+
+.calendario-fila.sobre-arrastre {
+    background-color: #e3f2fd;
+    border: 2px dashed #2196f3;
+    transform: scale(1.02);
+}
+
+.tecnico-contenedor {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.grip-icon {
+    color: #6c757d;
+    cursor: grab;
+    font-size: 12px;
+    transition: all 0.2s ease;
+    padding: 4px;
+    border-radius: 3px;
+}
+
+.grip-icon:hover {
+    color: #495057;
+    background-color: #e9ecef;
+    transform: scale(1.1);
+}
+
+.grip-icon:active {
+    cursor: grabbing;
+    color: #007bff;
+}
+
+/* Mejorar la apariencia durante el arrastre */
+.calendario-fila.arrastrando .grip-icon {
+    color: #007bff;
+}
+
+/* Indicador visual de que se puede arrastrar */
+.fila-header:hover .grip-icon {
+    color: #495057;
+}
+
+/* Efecto de elevación al arrastrar */
+.calendario-fila.arrastrando {
+    box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+}
+
+/* Estilos para celdas de turno */
+.celda-turno {
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.celda-turno:hover {
+    transform: scale(1.05);
+    z-index: 2;
+    position: relative;
+}
+
+.turno-display {
+    font-weight: 600;
+    font-size: 11px;
+    text-align: center;
+    padding: 4px 2px;
+}
+
+/* Leyenda mejorada */
+.leyenda-turnos {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 15px;
+    padding: 12px;
+    background: #f8f9fa;
+    border-radius: 6px;
+    flex-wrap: wrap;
+}
+
+.leyenda-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    background: white;
+    border: 1px solid #dee2e6;
+}
+
+.leyenda-color {
+    width: 14px;
+    height: 14px;
+    border-radius: 2px;
+    border: 1px solid #ccc;
+}
+
+/* Colores de turnos actualizados */
+.turno-manana {
+    background-color: #d1ecf1 !important;
+    border-left: 3px solid #17a2b8;
+}
+
+.turno-tarde {
+    background-color: #ffeaa7 !important;
+    border-left: 3px solid #ffc107;
+}
+
+.turno-noche {
+    background-color: #e9ecef !important;
+    border-left: 3px solid #6c757d;
+}
+
+.turno-apoyo {
+    background-color: #d4edda !important;
+    border-left: 3px solid #28a745;
+}
+
+.turno-descanso {
+    background-color: #f8d7da !important;
+    border-left: 3px solid #dc3545;
+}
+
+.turno-vacaciones {
+    background-color: #cce7ff !important;
+    border-left: 3px solid #007bff;
+}
+
+/* Estilos para múltiples semanas */
+.semana-container {
+    margin-bottom: 30px;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.semana-header {
+    background: #495057;
+    color: white;
+    padding: 10px 15px;
+    font-weight: 600;
+    font-size: 14px;
+    border-bottom: 1px solid #dee2e6;
+}
+
+/* Ajustes para calendarios múltiples */
+.calendario-grid {
+    min-width: 900px;
+    border: none;
+    border-radius: 0;
+}
+
+.semana-container:last-child {
+    margin-bottom: 0;
+}
+
+/* Mantener los estilos existentes pero ajustar para múltiples semanas */
+.calendario-header {
+    display: grid;
+    grid-template-columns: 200px repeat(7, 1fr);
+    background: #343a40;
+    color: white;
+}
+
+.calendario-fila {
+    display: grid;
+    grid-template-columns: 200px repeat(7, 1fr);
+    border-bottom: 1px solid #dee2e6;
+}
+
+/* Estilos para arrastre entre semanas */
+.calendario-fila.arrastrando {
+    opacity: 0.6;
+    background-color: #f8f9fa;
+}
+
+.calendario-fila.sobre-arrastre {
+    background-color: #e3f2fd;
+    border: 2px dashed #2196f3;
+}
+
+/* Ajustes responsive para múltiples semanas */
+@media (max-width: 768px) {
+    .semana-container {
+        margin-bottom: 20px;
+    }
+    
+    .semana-header {
+        padding: 8px 12px;
+        font-size: 13px;
+    }
+}
+
+/* 🔥 NUEVO: Estilos para indicadores de permisos */
+.permiso-indicador {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    margin-left: 10px;
+    border: 2px solid;
+}
+
+.permiso-indicador.admin {
+    background-color: #d4edda;
+    color: #155724;
+    border-color: #c3e6cb;
+}
+
+.permiso-indicador.user {
+    background-color: #fff3cd;
+    color: #856404;
+    border-color: #ffeaa7;
+}
+
+.permiso-indicador i {
+    margin-right: 5px;
+}
+
+/* Estilos para elementos deshabilitados */
+.calendario-fila.deshabilitado {
+    cursor: default !important;
+    opacity: 0.8;
+}
+
+.celda-turno.deshabilitado {
+    cursor: default !important;
+    pointer-events: none;
+}
+
+.grip-icon.deshabilitado {
+    display: none !important;
+}
+
+/* 🔥 NUEVO: Estilos para indicadores de permisos */
+.permiso-indicador {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    margin-left: 10px;
+    border: 2px solid;
+}
+
+.permiso-indicador.admin {
+    background-color: #d4edda;
+    color: #155724;
+    border-color: #c3e6cb;
+}
+
+.permiso-indicador.user {
+    background-color: #fff3cd;
+    color: #856404;
+    border-color: #ffeaa7;
+}
+
+.permiso-indicador i {
+    margin-right: 5px;
+}
+
+/* Estilos para elementos de solo lectura */
+.celda-solo-lectura {
+    cursor: default !important;
+    pointer-events: none;
+    opacity: 0.9;
+}
+
+.celda-solo-lectura:hover {
+    transform: none !important;
+    box-shadow: none !important;
+}
+
+.user-icon {
+    color: #6c757d;
+    font-size: 12px;
+    margin-right: 8px;
+}
+
+/* Estilos para elementos deshabilitados */
+.calendario-fila.deshabilitado {
+    cursor: default !important;
+    opacity: 0.8;
+}
+
+.grip-icon.deshabilitado {
+    display: none !important;
+}

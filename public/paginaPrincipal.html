@@ -14,6 +14,7 @@
     <link rel="stylesheet" href="/css/styles.css">
     <link rel="stylesheet" href="/css/dashboard.css">
     <link rel="stylesheet" href="/css/dashboard-enhanced.css">
+    <link rel="stylesheet" href="/css/HorariosCalendario.css">
 </head>
 <body>
     <div class="app-container">
@@ -99,18 +100,16 @@
                                 <span>Control de Mantenimientos</span>
                             </a>
                         </li>
-                        <!-- En el menú de Mantenimientos - agrega esta opción -->
-<li class="submenu-item">
-    <a href="#" class="submenu-link" id="reportes-mensuales-link">
-        <i class="fas fa-chart-bar"></i>
-        <span>Reportes Mensuales</span>
-    </a>
-</li>
+                        <li class="submenu-item">
+                            <a href="#" class="submenu-link" id="reportes-mensuales-link">
+                                <i class="fas fa-chart-bar"></i>
+                                <span>Reportes Mensuales</span>
+                            </a>
+                        </li>
                     </ul>
                 </li>
                 
                 <!-- Menú Configuración -->
-                 
                 <li class="menu-item">
                     <a href="#" class="menu-link">
                         <i class="fas fa-cog"></i>
@@ -118,29 +117,28 @@
                         <i class="fas fa-chevron-down arrow"></i>
                     </a>
                     <ul class="submenu">
-                    <li class="submenu-item">
-    <a href="#" class="submenu-link" onclick="ProfileManager.loadAndShowProfile()">
-        <i class="fas fa-user-cog"></i>
-        <span>Perfil</span>
-    </a>
-</li>
+                        <li class="submenu-item">
+                            <a href="#" class="submenu-link" onclick="ProfileManager.loadAndShowProfile()">
+                                <i class="fas fa-user-cog"></i>
+                                <span>Perfil</span>
+                            </a>
+                        </li>
                         <li class="submenu-item">
                             <a href="#" class="submenu-link">
                                 <i class="fas fa-lock"></i>
                                 <span>Seguridad</span>
                             </a>
                         </li>
-                     <!-- En el menú de configuración - agregar esta opción -->
-<li class="submenu-item">
-    <a href="#" class="submenu-link" id="admin-users-link">
-        <i class="fas fa-users-cog"></i>
-        <span>Gestionar Usuarios</span>
-    </a>
-</li>   
                         <li class="submenu-item">
-                            <a href="#" class="submenu-link">
-                                <i class="fas fa-bell"></i>
-                                <span>Notificaciones</span>
+                            <a href="#" class="submenu-link" id="admin-users-link">
+                                <i class="fas fa-users-cog"></i>
+                                <span>Gestionar Usuarios</span>
+                            </a>
+                        </li>   
+                        <li class="submenu-item">
+                            <a href="#" class="submenu-link" id="horarios-trabajo-link">
+                                <i class="fas fa-clock"></i>
+                                <span>Horarios de Trabajo</span>
                             </a>
                         </li>
                     </ul>
@@ -324,7 +322,7 @@
                             Control de Mantenimientos
                         </h2>
                         <button class="btn btn-secondary btn-back-dashboard">
-                            <i class="fas fa-arrow-left"></i> Volver
+                            <i class="fas fa-arrow-left"></i> Volver al Dashboard
                         </button>
                         <button class="btn btn-primary" id="refresh-maintenance">
                             <i class="fas fa-sync-alt"></i> Actualizar
@@ -338,7 +336,7 @@
                                     <tr>
                                         <th>Técnico</th>
                                         <th>Tipo</th>
-                                       <th>Ubicación</th> <!-- CAMBIADO: De "Dispositivo" a "Ubicación" -->
+                                        <th>Ubicación</th>
                                         <th>Fecha</th>
                                         <th>Estado</th>
                                         <th>Descripción</th>
@@ -354,164 +352,239 @@
                 </div>
 
                 <!-- Sección: Reportes Mensuales -->
-<div class="stats-section" id="reportes-mensuales-section" style="display: none;">
-    <div class="section-header">
-        <h2 style="color: #03213f; text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.5);">
-            Reportes Mensuales de Mantenimientos
-        </h2>
-        <button class="btn btn-secondary btn-back-dashboard">
-            <i class="fas fa-arrow-left"></i> Volver al Dashboard
-        </button>
-        <button class="btn btn-primary" id="generar-reporte-btn">
-            <i class="fas fa-file-pdf"></i> Generar Reporte PDF
-        </button>
-    </div>
-    
-    <div class="reportes-container">
-        <!-- Filtros -->
-        <div class="filtros-reporte">
-            <div class="filtro-group">
-                <label for="mes-reporte">Mes:</label>
-                <select id="mes-reporte" class="filtro-select">
-                    <option value="1">Enero</option>
-                    <option value="2">Febrero</option>
-                    <option value="3">Marzo</option>
-                    <option value="4">Abril</option>
-                    <option value="5">Mayo</option>
-                    <option value="6">Junio</option>
-                    <option value="7">Julio</option>
-                    <option value="8">Agosto</option>
-                    <option value="9">Septiembre</option>
-                    <option value="10">Octubre</option>
-                    <option value="11">Noviembre</option>
-                    <option value="12">Diciembre</option>
-                </select>
-            </div>
-            
-            <div class="filtro-group">
-                <label for="anio-reporte">Año:</label>
-                <select id="anio-reporte" class="filtro-select">
-                    <!-- Se llenará dinámicamente -->
-                </select>
-            </div>
-            
-            <div class="filtro-group">
-                <label for="tipo-reporte">Tipo de Reporte:</label>
-                <select id="tipo-reporte" class="filtro-select">
-                    <option value="completo">Reporte Completo</option>
-                    <option value="preventivo">Solo Preventivos</option>
-                    <option value="correctivo">Solo Correctivos</option>
-                    <option value="predictivo">Solo Predictivos</option>
-                </select>
-            </div>
-            
-            <button class="btn btn-success" id="aplicar-filtros">
-                <i class="fas fa-filter"></i> Aplicar Filtros
-            </button>
-        </div>
+                <div class="stats-section" id="reportes-mensuales-section" style="display: none;">
+                    <div class="section-header">
+                        <h2 style="color: #03213f; text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.5);">
+                            Reportes Mensuales de Mantenimientos
+                        </h2>
+                        <button class="btn btn-secondary btn-back-dashboard">
+                            <i class="fas fa-arrow-left"></i> Volver al Dashboard
+                        </button>
+                        <button class="btn btn-primary" id="generar-reporte-btn">
+                            <i class="fas fa-file-pdf"></i> Generar Reporte PDF
+                        </button>
+                    </div>
+                    
+                    <div class="reportes-container">
+                        <!-- Filtros -->
+                        <div class="filtros-reporte">
+                            <div class="filtro-group">
+                                <label for="mes-reporte">Mes:</label>
+                                <select id="mes-reporte" class="filtro-select">
+                                    <option value="1">Enero</option>
+                                    <option value="2">Febrero</option>
+                                    <option value="3">Marzo</option>
+                                    <option value="4">Abril</option>
+                                    <option value="5">Mayo</option>
+                                    <option value="6">Junio</option>
+                                    <option value="7">Julio</option>
+                                    <option value="8">Agosto</option>
+                                    <option value="9">Septiembre</option>
+                                    <option value="10">Octubre</option>
+                                    <option value="11">Noviembre</option>
+                                    <option value="12">Diciembre</option>
+                                </select>
+                            </div>
+                            
+                            <div class="filtro-group">
+                                <label for="anio-reporte">Año:</label>
+                                <select id="anio-reporte" class="filtro-select">
+                                    <!-- Se llenará dinámicamente -->
+                                </select>
+                            </div>
+                            
+                            <div class="filtro-group">
+                                <label for="tipo-reporte">Tipo de Reporte:</label>
+                                <select id="tipo-reporte" class="filtro-select">
+                                    <option value="completo">Reporte Completo</option>
+                                    <option value="preventivo">Solo Preventivos</option>
+                                    <option value="correctivo">Solo Correctivos</option>
+                                    <option value="predictivo">Solo Predictivos</option>
+                                </select>
+                            </div>
+                            
+                            <button class="btn btn-success" id="aplicar-filtros">
+                                <i class="fas fa-filter"></i> Aplicar Filtros
+                            </button>
+                        </div>
 
-        <!-- Estadísticas Resumen -->
-        <div class="estadisticas-resumen">
-            <div class="stat-card mini">
-                <div class="stat-header">
-                    <h3 class="stat-title">Total Mantenimientos</h3>
-                    <div class="stat-icon">
-                        <i class="fas fa-clipboard-list"></i>
-                    </div>
-                </div>
-                <div class="stat-value" id="total-mantenimientos">0</div>
-            </div>
-            
-            <div class="stat-card mini">
-                <div class="stat-header">
-                    <h3 class="stat-title">Preventivos</h3>
-                    <div class="stat-icon">
-                        <i class="fas fa-shield-alt"></i>
-                    </div>
-                </div>
-                <div class="stat-value" id="total-preventivos">0</div>
-            </div>
-            
-            <div class="stat-card mini">
-                <div class="stat-header">
-                    <h3 class="stat-title">Correctivos</h3>
-                    <div class="stat-icon">
-                        <i class="fas fa-tools"></i>
-                    </div>
-                </div>
-                <div class="stat-value" id="total-correctivos">0</div>
-            </div>
-            
-            <div class="stat-card mini">
-                <div class="stat-header">
-                    <h3 class="stat-title">Eficiencia</h3>
-                    <div class="stat-icon">
-                        <i class="fas fa-chart-line"></i>
-                    </div>
-                </div>
-                <div class="stat-value" id="eficiencia">0%</div>
-            </div>
-        </div>
+                        <!-- Estadísticas Resumen -->
+                        <div class="estadisticas-resumen">
+                            <div class="stat-card mini">
+                                <div class="stat-header">
+                                    <h3 class="stat-title">Total Mantenimientos</h3>
+                                    <div class="stat-icon">
+                                        <i class="fas fa-clipboard-list"></i>
+                                    </div>
+                                </div>
+                                <div class="stat-value" id="total-mantenimientos">0</div>
+                            </div>
+                            
+                            <div class="stat-card mini">
+                                <div class="stat-header">
+                                    <h3 class="stat-title">Preventivos</h3>
+                                    <div class="stat-icon">
+                                        <i class="fas fa-shield-alt"></i>
+                                    </div>
+                                </div>
+                                <div class="stat-value" id="total-preventivos">0</div>
+                            </div>
+                            
+                            <div class="stat-card mini">
+                                <div class="stat-header">
+                                    <h3 class="stat-title">Correctivos</h3>
+                                    <div class="stat-icon">
+                                        <i class="fas fa-tools"></i>
+                                    </div>
+                                </div>
+                                <div class="stat-value" id="total-correctivos">0</div>
+                            </div>
+                            
+                            <div class="stat-card mini">
+                                <div class="stat-header">
+                                    <h3 class="stat-title">Eficiencia</h3>
+                                    <div class="stat-icon">
+                                        <i class="fas fa-chart-line"></i>
+                                    </div>
+                                </div>
+                                <div class="stat-value" id="eficiencia">0%</div>
+                            </div>
+                        </div>
 
-        <!-- Gráficas -->
-        <div class="reporte-charts">
-            <div class="chart-card large">
-                <h3>Distribución por Tipo</h3>
-                <div class="chart-container">
-                    <canvas id="tipo-mantenimiento-chart"></canvas>
-                </div>
-            </div>
-            
-            <div class="chart-card large">
-                <h3>Mantenimientos por Técnico</h3>
-                <div class="chart-container">
-                    <canvas id="tecnico-chart"></canvas>
-                </div>
-            </div>
-            
-            <div class="chart-card large">
-                <h3>Evolución Semanal</h3>
-                <div class="chart-container">
-                    <canvas id="evolucion-chart"></canvas>
-                </div>
-            </div>
-            
-            <div class="chart-card large">
-                <h3>Dispositivos más Atendidos</h3>
-                <div class="chart-container">
-                    <canvas id="dispositivos-chart"></canvas>
-                </div>
-            </div>
-        </div>
+                        <!-- Gráficas -->
+                        <div class="reporte-charts">
+                            <div class="chart-card large">
+                                <h3>Distribución por Tipo</h3>
+                                <div class="chart-container">
+                                    <canvas id="tipo-mantenimiento-chart"></canvas>
+                                </div>
+                            </div>
+                            
+                            <div class="chart-card large">
+                                <h3>Mantenimientos por Técnico</h3>
+                                <div class="chart-container">
+                                    <canvas id="tecnico-chart"></canvas>
+                                </div>
+                            </div>
+                            
+                            <div class="chart-card large">
+                                <h3>Evolución Semanal</h3>
+                                <div class="chart-container">
+                                    <canvas id="evolucion-chart"></canvas>
+                                </div>
+                            </div>
+                            
+                            <div class="chart-card large">
+                                <h3>Dispositivos más Atendidos</h3>
+                                <div class="chart-container">
+                                    <canvas id="dispositivos-chart"></canvas>
+                                </div>
+                            </div>
+                        </div>
 
-        <!-- Tabla Detallada -->
-        <div class="tabla-reporte">
-            <div class="table-header">
-                <h3>Detalle de Mantenimientos</h3>
-                <button class="btn btn-secondary" id="exportar-excel">
-                    <i class="fas fa-file-excel"></i> Exportar a Excel
-                </button>
-            </div>
-            <div class="table-container">
-                <table class="reporte-table">
-                    <thead>
-                        <tr>
-                            <th>Fecha</th>
-                            <th>Técnico</th>
-                            <th>Tipo</th>
-                            <th>Ubicación</th>
-                            <th>Estado</th>
-                            <th>Repuestos Usados</th>
-                        </tr>
-                    </thead>
-                    <tbody id="tabla-reporte-body">
-                        <!-- Datos se cargarán aquí -->
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-</div>
+                        <!-- Tabla Detallada -->
+                        <div class="tabla-reporte">
+                            <div class="table-header">
+                                <h3>Detalle de Mantenimientos</h3>
+                                <button class="btn btn-secondary" id="exportar-excel">
+                                    <i class="fas fa-file-excel"></i> Exportar a Excel
+                                </button>
+                            </div>
+                            <div class="table-container">
+                                <table class="reporte-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Fecha</th>
+                                            <th>Técnico</th>
+                                            <th>Tipo</th>
+                                            <th>Ubicación</th>
+                                            <th>Estado</th>
+                                            <th>Repuestos Usados</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="tabla-reporte-body">
+                                        <!-- Datos se cargarán aquí -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sección: Horarios de Trabajo -->
+                <div class="stats-section" id="horarios-calendario-section" style="display: none;">
+                    <div class="section-header">
+                        <h2 style="color: #03213f; text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.5);">
+                            Gestión de Horarios de Trabajo
+                        </h2>
+                        <button class="btn btn-secondary btn-back-dashboard">
+                            <i class="fas fa-arrow-left"></i> Volver al Dashboard
+                        </button>
+                    </div>
+                    
+                    <div class="horarios-calendario-container">
+                        <!-- Controles del calendario -->
+                        <div class="controles-calendario">
+                            <div class="control-group">
+                                <label for="mes-calendario">Mes:</label>
+                                <select id="mes-calendario" class="control-select">
+                                    <!-- Se llena dinámicamente -->
+                                </select>
+                            </div>
+                            
+                            <div class="control-group">
+                                <label for="anio-calendario">Año:</label>
+                                <select id="anio-calendario" class="control-select">
+                                    <!-- Se llena dinámicamente -->
+                                </select>
+                            </div>
+                            
+                            <div class="acciones-calendario">
+                                <button class="btn btn-info" id="nuevo-tecnico-btn">
+                                    <i class="fas fa-user-plus"></i> Nuevo Técnico
+                                </button>
+                                <button class="btn btn-success" id="guardar-horarios">
+                                    <i class="fas fa-save"></i> Guardar Horarios
+                                </button>
+                                <button id="exportar-pdf-btn" class="btn-exportar-pdf">
+                                    <i class="fas fa-file-pdf"></i> Exportar PDF
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Calendario -->
+                        <div class="calendario-container">
+                            <div id="calendario-horarios">
+                                <!-- El calendario se renderiza aquí dinámicamente -->
+                                <div class="loading-calendario">
+                                    <i class="fas fa-spinner fa-spin"></i> Cargando calendario...
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sección: Gestionar Usuarios -->
+                <div class="stats-section" id="admin-users-section" style="display: none;">
+                    <div class="section-header">
+                        <h2 style="color: #03213f; text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.5);">
+                            Gestión de Usuarios
+                        </h2>
+                        <button class="btn btn-secondary btn-back-dashboard">
+                            <i class="fas fa-arrow-left"></i> Volver al Dashboard
+                        </button>
+                        <button class="btn btn-primary" id="refresh-users">
+                            <i class="fas fa-sync-alt"></i> Actualizar
+                        </button>
+                    </div>
+                    
+                    <div class="stats-container">
+                        <!-- Contenido de gestión de usuarios se cargará dinámicamente -->
+                        <div id="admin-users-content">
+                            <!-- Los datos de usuarios se cargarán aquí -->
+                        </div>
+                    </div>
+                </div>
 
                 <!-- Sección: Estadísticas de Dispositivos -->
                 <div class="stats-section" id="estadisticas-section" style="display: none;">
@@ -520,7 +593,7 @@
                             Dispositivos Mizooco
                         </h2>
                          <button class="btn btn-secondary btn-back-dashboard">
-                            <i class="fas fa-arrow-left"></i> Volver
+                            <i class="fas fa-arrow-left"></i> Volver al Dashboard
                         </button>
                         <button class="btn btn-primary" id="refresh-stats">
                             <i class="fas fa-sync-alt"></i> Actualizar
@@ -580,7 +653,7 @@
                             Inventario de Repuestos
                         </h2>
                         <button class="btn btn-secondary btn-back-dashboard">
-                            <i class="fas fa-arrow-left"></i> Volver
+                            <i class="fas fa-arrow-left"></i> Volver al Dashboard
                         </button>
                         <button class="btn btn-primary" id="refresh-insumos-stats">
                             <i class="fas fa-sync-alt"></i> Actualizar
@@ -744,197 +817,312 @@
                         </div>
                     </div>
                 </div>
+                
                 <!-- Modal: Perfil de Usuario -->
-<div id="profileModal" class="modal" style="display: none;">
-    <div class="modal-content profile-modal-content">
-        <span class="close-modal" onclick="ProfileManager.closeProfileModal()">&times;</span>
-        
-        <div class="modal-header">
-            <h2><i class="fas fa-user-circle profile-icon"></i> Perfil del Usuario</h2>
-            <p class="modal-subtitle">Gestiona tu información personal y seguridad</p>
-        </div>
-        
-        <div class="profile-info">
-            <!-- Información Personal -->
-            <div class="info-section">
-                <h3><i class="fas fa-id-card"></i> Información Personal</h3>
-                
-                <div class="info-card editable">
-                    <div class="info-row">
-                        <div class="info-icon"><i class="fas fa-user"></i></div>
-                        <div class="info-content">
-                            <div class="info-label">Nombre completo</div>
-                            <div id="profile-name" class="info-value">Cargando...</div>
-                            <input type="text" id="edit-profile-name" class="info-input" style="display: none;" placeholder="Ingrese su nombre">
+                <div id="profileModal" class="modal" style="display: none;">
+                    <div class="modal-content profile-modal-content">
+                        <span class="close-modal" onclick="ProfileManager.closeProfileModal()">&times;</span>
+                        
+                        <div class="modal-header">
+                            <h2><i class="fas fa-user-circle profile-icon"></i> Perfil del Usuario</h2>
+                            <p class="modal-subtitle">Gestiona tu información personal y seguridad</p>
                         </div>
-                        <button class="btn-edit" onclick="ProfileManager.toggleEdit('name')">
-                            <i class="fas fa-edit"></i>
-                        </button>
-                    </div>
-                </div>
-                
-                <div class="info-card editable">
-                    <div class="info-row">
-                        <div class="info-icon"><i class="fas fa-id-card"></i></div>
-                        <div class="info-content">
-                            <div class="info-label">Cédula</div>
-                            <div id="profile-cedula" class="info-value">Cargando...</div>
-                            <input type="text" id="edit-profile-cedula" class="info-input" style="display: none;" placeholder="Ingrese su cédula">
-                        </div>
-                        <button class="btn-edit" onclick="ProfileManager.toggleEdit('cedula')">
-                            <i class="fas fa-edit"></i>
-                        </button>
-                    </div>
-                </div>
-                
-                <div class="info-card editable">
-                    <div class="info-row">
-                        <div class="info-icon"><i class="fas fa-envelope"></i></div>
-                        <div class="info-content">
-                            <div class="info-label">Correo electrónico</div>
-                            <div id="profile-email" class="info-value">Cargando...</div>
-                            <input type="email" id="edit-profile-email" class="info-input" style="display: none;" placeholder="Ingrese su correo">
-                        </div>
-                        <button class="btn-edit" onclick="ProfileManager.toggleEdit('email')">
-                            <i class="fas fa-edit"></i>
-                        </button>
-                    </div>
-                </div>
-                
-                <div class="info-card">
-                    <div class="info-row">
-                        <div class="info-icon"><i class="fas fa-calendar-plus"></i></div>
-                        <div class="info-content">
-                            <div class="info-label">Miembro desde</div>
-                            <div id="profile-date" class="info-value">Cargando...</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+                        
+                        <div class="profile-info">
+                            <!-- Información Personal -->
+                            <div class="info-section">
+                                <h3><i class="fas fa-id-card"></i> Información Personal</h3>
+                                
+                                <div class="info-card editable">
+                                    <div class="info-row">
+                                        <div class="info-icon"><i class="fas fa-user"></i></div>
+                                        <div class="info-content">
+                                            <div class="info-label">Nombre completo</div>
+                                            <div id="profile-name" class="info-value">Cargando...</div>
+                                            <input type="text" id="edit-profile-name" class="info-input" style="display: none;" placeholder="Ingrese su nombre">
+                                        </div>
+                                        <button class="btn-edit" onclick="ProfileManager.toggleEdit('name')">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <div class="info-card editable">
+                                    <div class="info-row">
+                                        <div class="info-icon"><i class="fas fa-id-card"></i></div>
+                                        <div class="info-content">
+                                            <div class="info-label">Cédula</div>
+                                            <div id="profile-cedula" class="info-value">Cargando...</div>
+                                            <input type="text" id="edit-profile-cedula" class="info-input" style="display: none;" placeholder="Ingrese su cédula">
+                                        </div>
+                                        <button class="btn-edit" onclick="ProfileManager.toggleEdit('cedula')">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <div class="info-card editable">
+                                    <div class="info-row">
+                                        <div class="info-icon"><i class="fas fa-envelope"></i></div>
+                                        <div class="info-content">
+                                            <div class="info-label">Correo electrónico</div>
+                                            <div id="profile-email" class="info-value">Cargando...</div>
+                                            <input type="email" id="edit-profile-email" class="info-input" style="display: none;" placeholder="Ingrese su correo">
+                                        </div>
+                                        <button class="btn-edit" onclick="ProfileManager.toggleEdit('email')">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <div class="info-card">
+                                    <div class="info-row">
+                                        <div class="info-icon"><i class="fas fa-calendar-plus"></i></div>
+                                        <div class="info-content">
+                                            <div class="info-label">Miembro desde</div>
+                                            <div id="profile-date" class="info-value">Cargando...</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
 
-        <!-- Botón para cambiar contraseña -->
-<button class="btn btn-primary" id="toggle-password-change" onclick="ProfileManager.togglePasswordChange()">
-    <i class="fas fa-key"></i> Cambiar Contraseña
-</button>
-<!-- Sección de cambio de contraseña MEJORADA -->
-<div class="info-card" id="password-change-section" style="display: none;">
-    <div class="info-row">
-        <div class="info-icon"><i class="fas fa-key"></i></div>
-        <div class="info-content">
-            <div class="info-label">Nueva contraseña</div>
-            <div class="password-input-container">
-                <input type="password" id="new-password" class="info-input password-input" 
-                       placeholder="Mínimo 6 caracteres" 
-                       oninput="ProfileManager.updatePasswordStrength()">
-                <button type="button" class="toggle-password-btn" 
-                        onclick="ProfileManager.togglePasswordVisibility('new-password', this)"
-                        title="Mostrar contraseña">
-                    <i class="fas fa-eye"></i>
-                </button>
-            </div>
-            
-            <!-- Indicador de fortaleza -->
-            <div class="password-strength-meter" id="password-strength-meter">
-                <div class="strength-bar"></div>
-            </div>
-            <div class="password-strength-text" id="password-strength-text" style="font-size: 11px; color: #7f8c8d;">
-                Ingresa una contraseña
-            </div>
-            
-            <!-- Validaciones -->
-            <div class="password-validations" id="password-validations" style="margin-top: 8px;">
-                <div class="validation-item invalid">
-                    <i class="fas fa-times validation-icon"></i>
-                    <span>Mínimo 6 caracteres</span>
+                            <!-- Botón para cambiar contraseña -->
+                            <button class="btn btn-primary" id="toggle-password-change" onclick="ProfileManager.togglePasswordChange()">
+                                <i class="fas fa-key"></i> Cambiar Contraseña
+                            </button>
+                            
+                            <!-- Sección de cambio de contraseña MEJORADA -->
+                            <div class="info-card" id="password-change-section" style="display: none;">
+                                <div class="info-row">
+                                    <div class="info-icon"><i class="fas fa-key"></i></div>
+                                    <div class="info-content">
+                                        <div class="info-label">Nueva contraseña</div>
+                                        <div class="password-input-container">
+                                            <input type="password" id="new-password" class="info-input password-input" 
+                                                   placeholder="Mínimo 6 caracteres" 
+                                                   oninput="ProfileManager.updatePasswordStrength()">
+                                            <button type="button" class="toggle-password-btn" 
+                                                    onclick="ProfileManager.togglePasswordVisibility('new-password', this)"
+                                                    title="Mostrar contraseña">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                        </div>
+                                        
+                                        <!-- Indicador de fortaleza -->
+                                        <div class="password-strength-meter" id="password-strength-meter">
+                                            <div class="strength-bar"></div>
+                                        </div>
+                                        <div class="password-strength-text" id="password-strength-text" style="font-size: 11px; color: #7f8c8d;">
+                                            Ingresa una contraseña
+                                        </div>
+                                        
+                                        <!-- Validaciones -->
+                                        <div class="password-validations" id="password-validations" style="margin-top: 8px;">
+                                            <div class="validation-item invalid">
+                                                <i class="fas fa-times validation-icon"></i>
+                                                <span>Mínimo 6 caracteres</span>
+                                            </div>
+                                            <div class="validation-item invalid">
+                                                <i class="fas fa-times validation-icon"></i>
+                                                <span>Al menos una mayúscula</span>
+                                            </div>
+                                            <div class="validation-item invalid">
+                                                <i class="fas fa-times validation-icon"></i>
+                                                <span>Al menos una minúscula</span>
+                                            </div>
+                                            <div class="validation-item invalid">
+                                                <i class="fas fa-times validation-icon"></i>
+                                                <span>Al menos un número</span>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="info-label" style="margin-top: 15px;">Confirmar contraseña</div>
+                                        <div class="password-input-container">
+                                            <input type="password" id="confirm-password" class="info-input password-input" 
+                                                   placeholder="Repita la contraseña">
+                                            <button type="button" class="toggle-password-btn" 
+                                                    onclick="ProfileManager.togglePasswordVisibility('confirm-password', this)"
+                                                    title="Mostrar contraseña">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                        </div>
+                                        
+                                        <!-- Indicador de coincidencia -->
+                                        <div id="password-match" style="font-size: 11px; margin-top: 5px;"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Botón guardar -->
+                            <button class="btn btn-success" id="save-profile-btn" style="display: none;" onclick="ProfileManager.saveProfile()">
+                                <i class="fas fa-save"></i> Guardar Cambios
+                            </button>
+                            
+                            <div class="action-group">
+                                <button class="btn btn-warning" onclick="ProfileManager.loadAndShowProfile()">
+                                    <i class="fas fa-sync"></i> Actualizar
+                                </button>
+                                <button class="btn btn-danger" onclick="ProfileManager.confirmDeleteAccount()">
+                                    <i class="fas fa-trash"></i> Eliminar Cuenta
+                                </button>
+                                <button class="btn btn-secondary" onclick="ProfileManager.closeProfileModal()">
+                                    <i class="fas fa-times"></i> Cerrar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div class="validation-item invalid">
-                    <i class="fas fa-times validation-icon"></i>
-                    <span>Al menos una mayúscula</span>
-                </div>
-                <div class="validation-item invalid">
-                    <i class="fas fa-times validation-icon"></i>
-                    <span>Al menos una minúscula</span>
-                </div>
-                <div class="validation-item invalid">
-                    <i class="fas fa-times validation-icon"></i>
-                    <span>Al menos un número</span>
-                </div>
-            </div>
-            
-            <div class="info-label" style="margin-top: 15px;">Confirmar contraseña</div>
-            <div class="password-input-container">
-                <input type="password" id="confirm-password" class="info-input password-input" 
-                       placeholder="Repita la contraseña">
-                <button type="button" class="toggle-password-btn" 
-                        onclick="ProfileManager.togglePasswordVisibility('confirm-password', this)"
-                        title="Mostrar contraseña">
-                    <i class="fas fa-eye"></i>
-                </button>
-            </div>
-            
-            <!-- Indicador de coincidencia -->
-            <div id="password-match" style="font-size: 11px; margin-top: 5px;"></div>
-        </div>
-    </div>
-</div>
-<!-- Botón guardar -->
-<button class="btn btn-success" id="save-profile-btn" style="display: none;" onclick="ProfileManager.saveProfile()">
-    <i class="fas fa-save"></i> Guardar Cambios
-</button>
-            <div class="action-group">
-                <button class="btn btn-warning" onclick="ProfileManager.loadAndShowProfile()">
-                    <i class="fas fa-sync"></i> Actualizar
-                </button>
-                <button class="btn btn-danger" onclick="ProfileManager.confirmDeleteAccount()">
-                    <i class="fas fa-trash"></i> Eliminar Cuenta
-                </button>
-                <button class="btn btn-secondary" onclick="ProfileManager.closeProfileModal()">
-                    <i class="fas fa-times"></i> Cerrar
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
 
-<!-- Modal: Confirmación de eliminación de cuenta -->
-<div id="deleteAccountModal" class="modal" style="display: none;">
-    <div class="modal-content danger-modal">
-        <span class="close-modal" onclick="ProfileManager.closeModal('deleteAccountModal')">&times;</span>
-        
-        <div class="modal-header danger-header">
-            <h2><i class="fas fa-exclamation-triangle"></i> Confirmar Eliminación</h2>
-            <p class="modal-subtitle">Esta acción no se puede deshacer</p>
-        </div>
-        
-        <div class="delete-warning">
-            <div class="warning-icon">
-                <i class="fas fa-skull-crossbones"></i>
-            </div>
-            <div class="warning-content">
-                <h3>¿Está completamente seguro?</h3>
-                <p>Al eliminar su cuenta:</p>
-                <ul>
-                    <li>Se perderán todos sus datos permanentemente</li>
-                    <li>No podrá recuperar su cuenta</li>
-                    <li>Se cerrará su sesión inmediatamente</li>
-                </ul>
-                <p>Para confirmar, escriba <strong>ELIMINAR</strong> en el campo siguiente:</p>
+                <!-- Modal: Confirmación de eliminación de cuenta -->
+                <div id="deleteAccountModal" class="modal" style="display: none;">
+                    <div class="modal-content danger-modal">
+                        <span class="close-modal" onclick="ProfileManager.closeModal('deleteAccountModal')">&times;</span>
+                        
+                        <div class="modal-header danger-header">
+                            <h2><i class="fas fa-exclamation-triangle"></i> Confirmar Eliminación</h2>
+                            <p class="modal-subtitle">Esta acción no se puede deshacer</p>
+                        </div>
+                        
+                        <div class="delete-warning">
+                            <div class="warning-icon">
+                                <i class="fas fa-skull-crossbones"></i>
+                            </div>
+                            <div class="warning-content">
+                                <h3>¿Está completamente seguro?</h3>
+                                <p>Al eliminar su cuenta:</p>
+                                <ul>
+                                    <li>Se perderán todos sus datos permanentemente</li>
+                                    <li>No podrá recuperar su cuenta</li>
+                                    <li>Se cerrará su sesión inmediatamente</li>
+                                </ul>
+                                <p>Para confirmar, escriba <strong>ELIMINAR</strong> en el campo siguiente:</p>
+                                
+                                <input type="text" id="confirm-delete-text" class="confirm-input" 
+                                       placeholder="Escriba ELIMINAR para confirmar">
+                            </div>
+                        </div>
+                        
+                        <div class="modal-actions">
+                            <button class="btn btn-danger" id="confirm-delete-btn" onclick="ProfileManager.deleteAccount()" disabled>
+                                <i class="fas fa-trash"></i> Eliminar Cuenta Permanentemente
+                            </button>
+                            <button class="btn btn-secondary" onclick="ProfileManager.closeModal('deleteAccountModal')">
+                                <i class="fas fa-times"></i> Cancelar
+                            </button>
+                        </div>
+                    </div>
+                </div>
                 
-                <input type="text" id="confirm-delete-text" class="confirm-input" 
-                       placeholder="Escriba ELIMINAR para confirmar">
-            </div>
-        </div>
-        
-        <div class="modal-actions">
-            <button class="btn btn-danger" id="confirm-delete-btn" onclick="ProfileManager.deleteAccount()" disabled>
-                <i class="fas fa-trash"></i> Eliminar Cuenta Permanentemente
-            </button>
-            <button class="btn btn-secondary" onclick="ProfileManager.closeModal('deleteAccountModal')">
-                <i class="fas fa-times"></i> Cancelar
-            </button>
-        </div>
-    </div>
-</div>
+                <!-- Modal: Subir Horario de Trabajo -->
+                <div id="horarioModal" class="modal">
+                    <div class="modal-content">
+                        <span class="close-modal" onclick="HorariosManager.closeModal()">&times;</span>
+                        <h2><i class="fas fa-upload"></i> Subir Horario de Trabajo</h2>
+                        
+                        <form id="horarioForm" enctype="multipart/form-data">
+                            <div class="form-group">
+                                <label for="horario-mes">Mes *</label>
+                                <select id="horario-mes" name="mes" required>
+                                    <option value="">Seleccionar mes</option>
+                                    <option value="1">Enero</option>
+                                    <option value="2">Febrero</option>
+                                    <option value="3">Marzo</option>
+                                    <option value="4">Abril</option>
+                                    <option value="5">Mayo</option>
+                                    <option value="6">Junio</option>
+                                    <option value="7">Julio</option>
+                                    <option value="8">Agosto</option>
+                                    <option value="9">Septiembre</option>
+                                    <option value="10">Octubre</option>
+                                    <option value="11">Noviembre</option>
+                                    <option value="12">Diciembre</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="horario-anio">Año *</label>
+                                <select id="horario-anio" name="anio" required>
+                                    <!-- Se llenará dinámicamente -->
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="horario-archivo">Archivo PDF *</label>
+                                <div class="file-upload-container">
+                                    <input type="file" id="horario-archivo" name="archivo" 
+                                           accept=".pdf" required class="file-input">
+                                    <label for="horario-archivo" class="file-upload-label">
+                                        <i class="fas fa-cloud-upload-alt"></i>
+                                        <span>Seleccionar archivo PDF</span>
+                                    </label>
+                                    <div id="nombre-archivo" class="file-name"></div>
+                                </div>
+                                <small class="form-help">Solo se permiten archivos PDF. Tamaño máximo: 10MB</small>
+                            </div>
+                            
+                            <div class="form-actions">
+                                <button type="button" class="btn btn-secondary" onclick="HorariosManager.closeModal()">
+                                    Cancelar
+                                </button>
+                                <button type="submit" class="btn btn-primary" id="subir-horario-submit">
+                                    <i class="fas fa-upload"></i> Subir Horario
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Modal: Visualizar PDF -->
+                <div id="pdfViewerModal" class="modal pdf-viewer-modal">
+                    <div class="modal-content pdf-viewer-content">
+                        <span class="close-modal" onclick="HorariosManager.closePdfViewer()">&times;</span>
+                        <div class="pdf-viewer-header">
+                            <h3 id="pdf-viewer-title">Visualizando Horario</h3>
+                            <button class="btn btn-secondary" onclick="HorariosManager.downloadPdf()">
+                                <i class="fas fa-download"></i> Descargar
+                            </button>
+                        </div>
+                        <div class="pdf-viewer-container">
+                            <iframe id="pdf-viewer" src="" width="100%" height="600px" 
+                                    frameborder="0" allowfullscreen></iframe>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Modal: Nuevo Técnico -->
+                <div id="modal-tecnico" class="modal">
+                    <div class="modal-content">
+                        <span class="close-modal" onclick="HorariosCalendario.ocultarModalTecnico()">&times;</span>
+                        
+                        <div class="modal-header">
+                            <h3><i class="fas fa-user-plus"></i> Agregar Nuevo Técnico</h3>
+                        </div>
+                        
+                        <div class="modal-body">
+                            <form id="form-tecnico">
+                                <div class="form-group">
+                                    <label for="nombre-tecnico">Nombre del Técnico *</label>
+                                    <input type="text" id="nombre-tecnico" class="form-control" 
+                                           placeholder="Ingrese el nombre completo" required>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="color-tecnico">Color de identificación</label>
+                                    <input type="color" id="color-tecnico" class="color-picker" value="#007bff">
+                                </div>
+                            </form>
+                        </div>
+                        
+                        <div class="modal-footer">
+                            <button class="btn btn-secondary" onclick="HorariosCalendario.ocultarModalTecnico()">
+                                <i class="fas fa-times"></i> Cancelar
+                            </button>
+                            <button class="btn btn-primary" id="guardar-tecnico">
+                                <i class="fas fa-save"></i> Guardar Técnico
+                            </button>
+                        </div>
+                    </div>
+                </div>
 
                 <!-- Footer -->
                 <footer class="footer">
@@ -951,20 +1139,285 @@
     <!-- Scripts externos -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
- <!-- Librerías para exportación (mover antes de los scripts que las usan) -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- Librerías para exportación -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
-<!-- Scripts de la aplicación -->
-<script src="/js/api.js"></script>
-<script src="/js/utils.js"></script>
-<script src="/js/charts.js"></script>
-<script src="/js/profileManager.js"></script>
-<script src="/js/maintenanceManager.js"></script>
-<script src="/js/suppliesTableManager.js"></script>
-<script src="/js/inventoryApp.js"></script>
-<script src="/js/reportesManager.js"></script> <!-- NUEVO -->
-<script src="/js/dashboard-enhanced.js"></script>
-<script src="/js/admin-users.js"></script>
+    <!-- Scripts de la aplicación -->
+    <script src="/js/api.js"></script>
+    <script src="/js/utils.js"></script>
+    <script src="/js/charts.js"></script>
+    <script src="/js/profileManager.js"></script>
+    <script src="/js/maintenanceManager.js"></script>
+    <script src="/js/suppliesTableManager.js"></script>
+    <script src="/js/inventoryApp.js"></script>
+    <script src="/js/reportesManager.js"></script>
+    <script src="/js/dashboard-enhanced.js"></script>
+    <script src="/js/admin-users.js"></script>
+    <script src="/js/HorariosCalendario.js"></script>
+    
+    <!-- Asistencias: widget y modales -->
+    <div id="asistencia-widget" style="position:fixed; right:18px; bottom:18px; z-index:9999;">
+        <div style="display:flex; gap:8px;">
+            <button id="btn-checkin" class="btn btn-success" title="Marcar Entrada">
+                <i class="fas fa-sign-in-alt"></i>
+            </button>
+            <button id="btn-checkout" class="btn btn-danger" title="Marcar Salida">
+                <i class="fas fa-sign-out-alt"></i>
+            </button>
+            <button id="btn-asistencia-report" class="btn btn-primary" title="Reporte Asistencias">
+                <i class="fas fa-file-alt"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Modal para captura de foto -->
+    <div id="modal-asistencia" class="modal" style="display:none;">
+        <div class="modal-content" style="max-width:700px;">
+            <span class="close-modal" id="close-asistencia">&times;</span>
+            <div class="modal-header"><h3>Registrar Asistencia</h3></div>
+            <div class="modal-body">
+                <!-- Selector de usuario para administradores -->
+                <div id="usuario-selector-container" style="margin-bottom: 15px; display: none;">
+                    <label for="usuario-asistencia">Registrar para:</label>
+                    <select id="usuario-asistencia" class="form-control">
+                        <option value="">Cargando usuarios...</option>
+                    </select>
+                    <small class="text-muted">Solo administradores pueden registrar para otros usuarios</small>
+                </div>
+                
+                <div style="display:flex; gap:12px; flex-wrap:wrap;">
+                    <div style="flex:1; min-width:280px;">
+                        <video id="video-asistencia" autoplay playsinline style="width:100%; border-radius:6px; background:#000"></video>
+                    </div>
+                    <div style="flex:1; min-width:220px; display:flex; flex-direction:column; gap:8px; align-items:center;">
+                        <canvas id="canvas-asistencia" width="320" height="240" style="display:none; border-radius:6px; background:#eee;"></canvas>
+                        <div id="asistencia-buttons" style="display:flex; gap:8px;">
+                            <button id="tomar-foto-btn" class="btn btn-primary">Tomar Foto</button>
+                            <button id="enviar-checkin-btn" class="btn btn-success">Enviar Entrada</button>
+                            <button id="enviar-checkout-btn" class="btn btn-danger">Enviar Salida</button>
+                        </div>
+                        <small id="asistencia-msg" style="display:block; color:#333"></small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal reporte -->
+    <div id="modal-asistencia-report" class="modal" style="display:none;">
+        <div class="modal-content" style="max-width:900px;">
+            <span class="close-modal" id="close-asistencia-report">&times;</span>
+            <div class="modal-header"><h3>Reporte de Asistencias</h3></div>
+            <div class="modal-body">
+                <div style="display:flex; gap:8px; align-items:center; margin-bottom:12px;">
+                    <input type="date" id="report-start" class="form-control" />
+                    <input type="date" id="report-end" class="form-control" />
+                    <select id="report-user" class="form-control" style="min-width:200px;">
+                        <option value="">Todos los usuarios</option>
+                    </select>
+                    <button id="buscar-report" class="btn btn-primary">Buscar</button>
+                    <button id="export-report" class="btn btn-secondary">Exportar CSV</button>
+                </div>
+                <div style="max-height:400px; overflow:auto;">
+                    <table class="table table-striped" id="tabla-asistencias">
+                        <thead><tr><th>Fecha</th><th>Usuario</th><th>Tipo</th><th>Foto</th><th>IP</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/asistencias.js"></script>
+    
+    <!-- Script para gestionar la navegación entre secciones -->
+    <script>
+        // Variables para controlar las secciones
+        let currentSection = 'dashboard-section';
+        
+        // Función para mostrar una sección específica
+        function showSection(sectionId) {
+            // Ocultar todas las secciones
+            document.querySelectorAll('.stats-section, .dashboard-content').forEach(section => {
+                section.style.display = 'none';
+            });
+            
+            // Mostrar la sección solicitada
+            const section = document.getElementById(sectionId);
+            if (section) {
+                section.style.display = 'block';
+                currentSection = sectionId;
+                
+                // Actualizar botones "Volver" si es necesario
+                updateBackButtons();
+                
+                // Forzar actualización de contenido si es necesario
+                if (sectionId === 'control-mantenimientos-section') {
+                    if (typeof MaintenanceManager !== 'undefined') {
+                        MaintenanceManager.loadMaintenanceData();
+                    }
+                } else if (sectionId === 'estadisticas-section') {
+                    if (typeof InventoryApp !== 'undefined') {
+                        InventoryApp.loadDeviceStats();
+                    }
+                } else if (sectionId === 'estadisticas-insumos-section') {
+                    if (typeof InventoryApp !== 'undefined') {
+                        InventoryApp.loadSuppliesStats();
+                    }
+                } else if (sectionId === 'reportes-mensuales-section') {
+                    if (typeof ReportesManager !== 'undefined') {
+                        ReportesManager.cargarAnios();
+                        ReportesManager.cargarReportes();
+                    }
+                } else if (sectionId === 'horarios-calendario-section') {
+                    if (typeof HorariosCalendario !== 'undefined') {
+                        HorariosCalendario.inicializar();
+                    }
+                } else if (sectionId === 'admin-users-section') {
+                    if (typeof AdminUsersManager !== 'undefined') {
+                        AdminUsersManager.loadUsers();
+                    }
+                }
+            }
+        }
+        
+        // Función para actualizar los botones "Volver"
+        function updateBackButtons() {
+            document.querySelectorAll('.btn-back-dashboard').forEach(btn => {
+                btn.innerHTML = '<i class="fas fa-arrow-left"></i> Volver al Dashboard';
+                btn.onclick = () => showSection('dashboard-section');
+            });
+        }
+        
+        // Event Listeners para los enlaces del menú
+        document.addEventListener('DOMContentLoaded', function() {
+            // Control de Mantenimientos
+            const controlMantenimientosLink = document.getElementById('control-mantenimientos-link');
+            if (controlMantenimientosLink) {
+                controlMantenimientosLink.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    showSection('control-mantenimientos-section');
+                });
+            }
+            
+            // Reportes Mensuales
+            const reportesMensualesLink = document.getElementById('reportes-mensuales-link');
+            if (reportesMensualesLink) {
+                reportesMensualesLink.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    showSection('reportes-mensuales-section');
+                });
+            }
+            
+            // Dispositivos Mizooco
+            const estadisticasLink = document.getElementById('estadisticas-link');
+            if (estadisticasLink) {
+                estadisticasLink.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    showSection('estadisticas-section');
+                });
+            }
+            
+            // Inventario de Repuestos
+            const estadisticasInsumosLink = document.getElementById('estadisticas-insumos-link');
+            if (estadisticasInsumosLink) {
+                estadisticasInsumosLink.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    showSection('estadisticas-insumos-section');
+                });
+            }
+            
+            // Horarios de Trabajo
+            const horariosTrabajoLink = document.getElementById('horarios-trabajo-link');
+            if (horariosTrabajoLink) {
+                horariosTrabajoLink.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    showSection('horarios-calendario-section');
+                });
+            }
+            
+            // Gestionar Usuarios
+            const adminUsersLink = document.getElementById('admin-users-link');
+            if (adminUsersLink) {
+                adminUsersLink.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    showSection('admin-users-section');
+                });
+            }
+            
+            // Actualizar botones "Volver"
+            updateBackButtons();
+            
+            // Botón de actualizar del dashboard
+            const refreshDashboardBtn = document.getElementById('refreshDashboard');
+            if (refreshDashboardBtn) {
+                refreshDashboardBtn.addEventListener('click', function() {
+                    if (currentSection === 'dashboard-section') {
+                        if (typeof DashboardEnhanced !== 'undefined') {
+                            DashboardEnhanced.loadDashboardData();
+                        }
+                    } else if (currentSection === 'control-mantenimientos-section') {
+                        if (typeof MaintenanceManager !== 'undefined') {
+                            MaintenanceManager.loadMaintenanceData();
+                        }
+                    } else if (currentSection === 'estadisticas-section') {
+                        if (typeof InventoryApp !== 'undefined') {
+                            InventoryApp.loadDeviceStats();
+                        }
+                    } else if (currentSection === 'estadisticas-insumos-section') {
+                        if (typeof InventoryApp !== 'undefined') {
+                            InventoryApp.loadSuppliesStats();
+                        }
+                    }
+                });
+            }
+            
+            // Configurar botones de actualización específicos
+            const refreshMaintenanceBtn = document.getElementById('refresh-maintenance');
+            if (refreshMaintenanceBtn) {
+                refreshMaintenanceBtn.addEventListener('click', function() {
+                    if (typeof MaintenanceManager !== 'undefined') {
+                        MaintenanceManager.loadMaintenanceData();
+                    }
+                });
+            }
+            
+            const refreshStatsBtn = document.getElementById('refresh-stats');
+            if (refreshStatsBtn) {
+                refreshStatsBtn.addEventListener('click', function() {
+                    if (typeof InventoryApp !== 'undefined') {
+                        InventoryApp.loadDeviceStats();
+                    }
+                });
+            }
+            
+            const refreshInsumosStatsBtn = document.getElementById('refresh-insumos-stats');
+            if (refreshInsumosStatsBtn) {
+                refreshInsumosStatsBtn.addEventListener('click', function() {
+                    if (typeof InventoryApp !== 'undefined') {
+                        InventoryApp.loadSuppliesStats();
+                    }
+                });
+            }
+            
+            const refreshUsersBtn = document.getElementById('refresh-users');
+            if (refreshUsersBtn) {
+                refreshUsersBtn.addEventListener('click', function() {
+                    if (typeof AdminUsersManager !== 'undefined') {
+                        AdminUsersManager.loadUsers();
+                    }
+                });
+            }
+            
+            // Inicializar el dashboard por defecto
+            showSection('dashboard-section');
+        });
+        
+        // Función para volver al dashboard desde cualquier lugar
+        window.goToDashboard = function() {
+            showSection('dashboard-section');
+        };
+    </script>
 </body>
 </html>

@@ -170,7 +170,9 @@ router.get("/", async (req, res) => {
             SELECT 
                 m.*,
                 COALESCE(u.nombre, 'Técnico no especificado') as tecnico,
+                -- ✅ OBTENER TANTO EL NOMBRE COMO EL CÓDIGO DEL REPUESTO
                 COALESCE(r.nombre, 'Sin repuesto') as repuesto,
+                COALESCE(r.codigo, '') as codigo_repuesto,
                 
                 -- ✅ USAR EL TIPO GUARDADO EN LA TABLA PARA DETERMINAR EL DISPOSITIVO
                 CASE 
@@ -242,7 +244,9 @@ router.get("/:id", async (req, res) => {
             SELECT 
                 m.*,
                 COALESCE(u.nombre, 'Técnico no especificado') as tecnico,
+                -- ✅ OBTENER TANTO EL NOMBRE COMO EL CÓDIGO DEL REPUESTO
                 COALESCE(r.nombre, 'Sin repuesto') as repuesto,
+                COALESCE(r.codigo, '') as codigo_repuesto,
                 
                 -- Información del dispositivo
                 CASE 
@@ -286,7 +290,9 @@ router.get("/:id", async (req, res) => {
         
         Logger.info('Mantenimiento encontrado', { 
             id: id,
-            dispositivo: mantenimiento[0].nombre_dispositivo
+            dispositivo: mantenimiento[0].nombre_dispositivo,
+            repuesto: mantenimiento[0].repuesto,
+            codigo_repuesto: mantenimiento[0].codigo_repuesto
         });
         
         return res.json({

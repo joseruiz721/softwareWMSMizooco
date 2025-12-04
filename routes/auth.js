@@ -134,7 +134,9 @@ router.post("/login", async (req, res) => {
             fecha_registro: usuario.fecha_registro
         };
         
+        // Guardar la sesión tanto con el objeto user como con userId para compatibilidad
         req.session.user = userSessionData;
+        req.session.userId = usuario.id;
         
         // Generar token JWT
         const token = jwt.sign(

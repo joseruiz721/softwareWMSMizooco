@@ -219,47 +219,66 @@ class AuthManager {
         this.setupAuthInterceptor();
     }
 
-    /**
-     * 🔥 CORREGIDO: Configurar interceptor para todas las peticiones fetch
-     */
-    setupAuthInterceptor() {
-        const originalFetch = window.fetch;
+  /**
+ * 🔥 CORREGIDO: Configurar interceptor para todas las peticiones fetch
+ * ✅ Ahora respeta FormData y no fuerza application/json
+ */
+setupAuthInterceptor() {
+    const originalFetch = window.fetch;
+    
+    window.fetch = async (url, options = {}) => {
+        // Determinar si es FormData
+        const isFormData = options.body && options.body instanceof FormData;
+        const isAsistenciasRequest = typeof url === 'string' && 
+            (url.includes('/api/asistencias/') || 
+             url.includes('/upload') || 
+             url.includes('/api/horarios/subir'));
         
-        window.fetch = async (url, options = {}) => {
-            // Solo agregar token a rutas API que requieran autenticación
-            if (typeof url === 'string' && url.startsWith('/api/') && !this.isPublicRoute(url)) {
-                const token = this.getToken();
-                if (token) {
+        // Solo agregar token a rutas API que requieran autenticación
+        if (typeof url === 'string' && url.startsWith('/api/') && !this.isPublicRoute(url)) {
+            const token = this.getToken();
+            if (token) {
+                // 🔥 CORRECCIÓN: Si es FormData (asistencias con fotos), NO agregar Content-Type
+                if (isFormData || isAsistenciasRequest) {
+                    // Para FormData, el navegador establece automáticamente:
+                    // Content-Type: multipart/form-data; boundary=----WebKitFormBoundary...
+                    options.headers = {
+                        ...options.headers,
+                        'Authorization': `Bearer ${token}`
+                        // NO agregamos Content-Type aquí
+                    };
+                } else {
+                    // Para JSON normal, agregar Content-Type
                     options.headers = {
                         ...options.headers,
                         'Authorization': `Bearer ${token}`,
                         'Content-Type': 'application/json'
                     };
-                } else {
-                    console.warn('⚠️ No hay token disponible para petición a:', url);
                 }
+            } else {
+                console.warn('⚠️ No hay token disponible para petición a:', url);
+            }
+        }
+        
+        try {
+            const response = await originalFetch(url, options);
+            
+            // Si la respuesta es 401, limpiar sesión
+            if (response.status === 401) {
+                console.warn('❌ Token inválido o expirado');
+                this.clearSession();
+                // NO redirigir automáticamente aquí para evitar bucles
             }
             
-            try {
-                const response = await originalFetch(url, options);
-                
-                // Si la respuesta es 401, limpiar sesión
-                if (response.status === 401) {
-                    console.warn('❌ Token inválido o expirado');
-                    this.clearSession();
-                    // NO redirigir automáticamente aquí para evitar bucles
-                }
-                
-                return response;
-            } catch (error) {
-                console.error('❌ Error en petición fetch:', error);
-                throw error;
-            }
-        };
+            return response;
+        } catch (error) {
+            console.error('❌ Error en petición fetch:', error);
+            throw error;
+        }
+    };
 
-        console.log('✅ Interceptor de autenticación configurado');
-    }
-
+    console.log('✅ Interceptor de autenticación configurado (soporta FormData)');
+}
     /**
      * 🔥 CORREGIDO: Verificar si es una ruta pública que no requiere token
      */
@@ -346,24 +365,28 @@ class AuthManager {
         this.updateUIForAuthState();
     }
 
-    /**
-     * 🔐 MÉTODO: Obtener headers para requests autenticados
-     */
-    getAuthHeaders() {
-        const token = this.getToken();
-        if (!token) {
-            console.warn('⚠️ No hay token disponible para la petición');
-            return {
-                'Content-Type': 'application/json'
-            };
-        }
-        
-        return {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-        };
+  /**
+ * 🔐 MÉTODO: Obtener headers para requests autenticados
+ * ✅ Ahora soporta FormData cuando se pasa el parámetro isFormData
+ */
+getAuthHeaders(isFormData = false) {
+    const token = this.getToken();
+    if (!token) {
+        console.warn('⚠️ No hay token disponible para la petición');
+        return isFormData ? {} : { 'Content-Type': 'application/json' };
     }
-
+    
+    const headers = {
+        'Authorization': `Bearer ${token}`
+    };
+    
+    // Solo agregar Content-Type si NO es FormData
+    if (!isFormData) {
+        headers['Content-Type'] = 'application/json';
+    }
+    
+    return headers;
+}
     /**
      * 🔥 CORREGIDO: Hacer petición autenticada con manejo de errores
      */

@@ -1,4 +1,4 @@
-// server.js - VERSIÓN COMPLETA CORREGIDA
+// server.js - VERSIÓN CORREGIDA PARA ASISTENCIAS CON FOTOS Y MULTI-USUARIO
 require('dotenv').config(); 
 
 const express = require("express");
@@ -26,13 +26,17 @@ const repuestoRoutes = require('./routes/repuestos');
 const mantenimientoRoutes = require('./routes/mantenimientos');
 const dashboardRoutes = require('./routes/dashboard');
 
+// Importar rutas de horarios calendario y asistencias
+const horariosCalendarioRoutes = require('./routes/horariosCalendario');
+const asistenciasRoutes = require('./routes/asistencias');
+
 const app = express();
 
 // ==============================================
-// CONFIGURACIÓN INICIAL
+// CONFIGURACIÓN INICIAL - CRÍTICAMENTE CORREGIDA
 // ==============================================
 
-// Middleware básico
+// Configurar CORS primero
 app.use(cors({
     origin: process.env.FRONTEND_URL || 'http://localhost:3000',
     credentials: true,
@@ -40,11 +44,8 @@ app.use(cors({
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Configurar sesión antes de los parsers
 app.set('trust proxy', 1); 
-
-// Configuración de sesión
 app.use(session({
     store: databaseConfig.sessionStore,
     secret: process.env.SESSION_SECRET || 'fallback-secret-key-2024-wms-mizooco',
@@ -58,7 +59,50 @@ app.use(session({
     }
 }));
 
-// 🔥 CORRECCIÓN CRÍTICA: Middleware de enriquecimiento de sesión OPTIMIZADO
+// Middleware para archivos estáticos PRIMERO
+app.use(express.static(path.join(__dirname, "public")));
+
+// Servir archivos subidos (uploads) desde public/uploads
+app.use('/uploads', express.static(path.join(__dirname, "public", "uploads")));
+
+// Middleware para JSON y URL encoded para el resto de rutas
+// Excluimos las rutas que manejan multipart
+app.use((req, res, next) => {
+    const url = req.url;
+    
+    // Si es una ruta que maneja FormData (asistencias), saltar los parsers de JSON
+    if (url.includes('/api/asistencias/registrar') || 
+        url.includes('/api/asistencias/checkin') || 
+        url.includes('/api/asistencias/checkout') ||
+        url.includes('/api/asistencias/registrar-multi')) {
+        
+        // Para estas rutas, no usar body-parser JSON
+        // multer se encargará de parsear el multipart
+        req._body = true;
+        req.body = {};
+        return next();
+    }
+    
+    // Para otras rutas, usar body-parser normal
+    express.json({ limit: '10mb' })(req, res, (err) => {
+        if (err && err.type === 'entity.parse.failed') {
+            if (!req.headers['content-type']?.includes('application/json')) {
+                req._body = true;
+                req.body = {};
+                return next();
+            }
+            return res.status(400).json({
+                success: false,
+                message: 'JSON inválido'
+            });
+        }
+        next(err);
+    });
+});
+
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Middleware de enriquecimiento de sesión OPTIMIZADO
 app.use((req, res, next) => {
     // Excluir archivos estáticos y rutas que no necesitan enriquecimiento
     if (req.path.startsWith('/css/') || 
@@ -93,9 +137,6 @@ app.use((req, res, next) => {
     next();
 });
 
-// Servir archivos estáticos
-app.use(express.static(path.join(__dirname, "public")));
-
 // ==============================================
 // RUTAS PRINCIPALES - PERMISOS ACTUALIZADOS
 // ==============================================
@@ -103,35 +144,206 @@ app.use(express.static(path.join(__dirname, "public")));
 // Rutas de autenticación (públicas)
 app.use('/auth', authRoutes);
 
-// 🔥 CORREGIDO: Rutas de API - TODOS LOS USUARIOS AUTENTICADOS PUEDEN ACCEDER
+// Rutas de API - TODOS LOS USUARIOS AUTENTICADOS PUEDEN ACCEDER
 app.use('/api/usuarios', optionalToken, usuarioRoutes);
 app.use('/api/dispositivos', optionalToken, dispositivoRoutes);
 app.use('/api/repuestos', optionalToken, repuestoRoutes);
 app.use('/api/mantenimientos', optionalToken, mantenimientoRoutes);
 app.use('/api/dashboard', optionalToken, dashboardRoutes);
 
-// 🔐 RUTAS DE ADMINISTRACIÓN (SOLO PARA ADMINS)
+// Rutas de horarios calendario
+app.use('/api/horarios-calendario', requireAuth, horariosCalendarioRoutes);
+
+// 🔥 NUEVO: Rutas para gestión de asistencias - CON SISTEMA MULTI-USUARIO
+app.use('/api/asistencias', requireAuth, asistenciasRoutes);
+
+// RUTAS DE ADMINISTRACIÓN (SOLO PARA ADMINS)
 app.use('/api/admin/usuarios', authenticateToken, requireAdmin, usuarioRoutes);
 
 // ==============================================
-// RUTAS ESPECIALES PARA VERIFICACIÓN DE ROLES
+// 🔥 NUEVAS RUTAS PARA SISTEMA MULTI-USUARIO DE ASISTENCIAS
 // ==============================================
 
-app.get('/api/check-admin', optionalToken, (req, res) => {
-    const isAuthenticated = !!req.user;
-    const isAdmin = req.user?.role === 'admin';
+// 🔥 Ruta para obtener usuarios activos - MODIFICADA
+app.get('/api/usuarios/activos', requireAuth, async (req, res) => {
+    try {
+        console.log('📋 Solicitando lista de usuarios activos...');
+        
+        // Query para obtener todos los usuarios activos
+        const rows = await databaseConfig.queryAsync(
+            `SELECT id, cedula, nombre, correo, role, fecha_registro 
+             FROM usuarios 
+             WHERE role IN ('admin', 'user', 'tecnico')
+             ORDER BY nombre ASC`
+        );
+        
+        console.log(`✅ ${rows.length} usuarios cargados para selector`);
+        
+        res.json({
+            success: true,
+            data: rows
+        });
+    } catch (error) {
+        console.error('❌ Error obteniendo usuarios activos:', error.message);
+        res.status(500).json({
+            success: false,
+            message: 'Error al obtener la lista de usuarios'
+        });
+    }
+});
+
+// 🔥 NUEVO: Ruta para que usuarios normales vean registros recientes
+app.get('/api/asistencias/registros-recientes', requireAuth, async (req, res) => {
+    try {
+        const userId = req.session?.user?.id;
+        
+        if (!userId) {
+            return res.status(401).json({
+                success: false,
+                message: 'Usuario no autenticado'
+            });
+        }
+        
+        const hoy = new Date().toISOString().split('T')[0];
+        const rows = await databaseConfig.queryAsync(
+            `SELECT a.tipo, a.fecha, a.foto_path, 
+                    u.nombre as usuario_nombre,
+                    a.registrante_nombre
+             FROM asistencias a
+             LEFT JOIN usuarios u ON a.usuario_id = u.id
+             WHERE (a.usuario_id = $1 OR a.registrante_id = $1)
+             AND DATE(a.fecha) = $2
+             ORDER BY a.fecha DESC
+             LIMIT 10`,
+            [userId, hoy]
+        );
+        
+        return res.json({
+            success: true,
+            data: rows
+        });
+        
+    } catch (error) {
+        console.error('❌ Error obteniendo registros recientes:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error obteniendo registros recientes'
+        });
+    }
+});
+
+// 🔥 NUEVO: Endpoint para dashboard - obtener estadísticas rápidas diferenciadas por rol
+app.get('/api/asistencias/dashboard-estadisticas', requireAuth, async (req, res) => {
+    try {
+        const userId = req.session?.user?.id;
+        const isAdmin = req.session?.user?.role === 'admin';
+        
+        if (!userId) {
+            return res.status(401).json({
+                success: false,
+                message: 'Usuario no autenticado'
+            });
+        }
+        
+        let estadisticas = {};
+        
+        if (isAdmin) {
+            // Para admin: total de registros hoy
+            const hoy = new Date().toISOString().split('T')[0];
+            const totalHoy = await databaseConfig.queryAsync(
+                `SELECT COUNT(*) as total FROM asistencias WHERE DATE(fecha) = $1`,
+                [hoy]
+            );
+            
+            // Últimos 5 registros de todos los usuarios
+            const ultimosRegistros = await databaseConfig.queryAsync(
+                `SELECT a.*, u.nombre, u.cedula
+                 FROM asistencias a 
+                 JOIN usuarios u ON a.usuario_id = u.id 
+                 ORDER BY a.fecha DESC 
+                 LIMIT 5`
+            );
+            
+            // Usuarios que registraron hoy
+            const usuariosHoy = await databaseConfig.queryAsync(
+                `SELECT DISTINCT u.nombre, COUNT(a.id) as registros
+                 FROM asistencias a
+                 JOIN usuarios u ON a.usuario_id = u.id
+                 WHERE DATE(a.fecha) = $1
+                 GROUP BY u.id, u.nombre
+                 ORDER BY registros DESC`,
+                [hoy]
+            );
+            
+            estadisticas = {
+                totalHoy: parseInt(totalHoy[0]?.total || 0),
+                ultimosRegistros: ultimosRegistros,
+                usuariosHoy: usuariosHoy,
+                isAdmin: true
+            };
+        } else {
+            // Para usuario normal: su último registro y estadísticas personales
+            const ultimoRegistro = await databaseConfig.queryAsync(
+                `SELECT tipo, fecha FROM asistencias 
+                 WHERE usuario_id = $1 
+                 ORDER BY fecha DESC 
+                 LIMIT 1`,
+                [userId]
+            );
+            
+            // Registros de hoy del usuario
+            const hoy = new Date().toISOString().split('T')[0];
+            const registrosHoy = await databaseConfig.queryAsync(
+                `SELECT tipo, fecha FROM asistencias 
+                 WHERE usuario_id = $1 AND DATE(fecha) = $2
+                 ORDER BY fecha DESC`,
+                [userId, hoy]
+            );
+            
+            estadisticas = {
+                ultimoRegistro: ultimoRegistro[0] || null,
+                registrosHoy: registrosHoy,
+                totalHoy: registrosHoy.length,
+                isAdmin: false
+            };
+        }
+        
+        return res.json({
+            success: true,
+            data: estadisticas
+        });
+        
+    } catch (error) {
+        console.error('❌ Error obteniendo estadísticas de dashboard:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error obteniendo estadísticas'
+        });
+    }
+});
+
+// ==============================================
+// RUTA ESPECIAL PARA VERIFICACIÓN DE ROLES - CORREGIDA
+// ==============================================
+
+app.get('/api/check-admin', requireAuth, (req, res) => {
+    const isAuthenticated = !!req.session.user;
+    const isAdmin = req.session.user?.role === 'admin';
     
-    Logger.auth('Verificación de rol administrador', req.user?.nombre || 'No autenticado', isAdmin);
+    console.log('🔐 Verificación de rol administrador:', {
+        usuario: req.session.user?.nombre || 'No autenticado',
+        esAdmin: isAdmin
+    });
     
     res.json({
         success: true,
         authenticated: isAuthenticated,
         isAdmin: isAdmin,
-        user: req.user ? {
-            id: req.user.id,
-            nombre: req.user.nombre,
-            correo: req.user.correo,
-            role: req.user.role
+        user: req.session.user ? {
+            id: req.session.user.id,
+            nombre: req.session.user.nombre,
+            correo: req.session.user.correo,
+            role: req.session.user.role
         } : null
     });
 });
@@ -618,7 +830,7 @@ app.get("/admin-register", requireAuth, requireAdmin, (req, res) => {
         rol: req.session.user.role
     });
     
-    // 🔥 CORRECCIÓN: Verificar si ya está en dashboard para evitar sesiones duplicadas
+    // Verificar si ya está en dashboard para evitar sesiones duplicadas
     if (req.headers.referer && req.headers.referer.includes('/dashboard')) {
         console.log('📋 Acceso a admin-register desde dashboard - sesión única');
     } else {
@@ -638,7 +850,7 @@ app.get("/admin-register", requireAuth, requireAdmin, (req, res) => {
     }
 });
 
-// Rutas protegidas - 🔥 CORREGIDO: TODOS LOS USUARIOS AUTENTICADOS PUEDEN ACCEDER
+// Rutas protegidas - TODOS LOS USUARIOS AUTENTICADOS PUEDEN ACCEDER
 app.get("/dashboard", requireAuth, (req, res) => {
     Logger.auth('Acceso al dashboard', req.session.user.nombre, true);
     res.sendFile(path.join(__dirname, "public", "paginaPrincipal.html"));
@@ -792,7 +1004,7 @@ app.get('/reestablecer-pass/:token', async (req, res) => {
 // RUTAS DE SALUD Y ESTADO - CORREGIDAS
 // ==============================================
 
-// 🔐 CORREGIDO: Ruta de salud que no requiere autenticación
+// Ruta de salud que no requiere autenticación
 app.get('/api/health', (req, res) => {
     res.json({
         status: 'OK',
@@ -943,11 +1155,24 @@ app.listen(PORT, () => {
     console.log('👑 Ruta de administración: /api/admin/*');
     console.log('🔒 Middleware de autenticación JWT configurado');
     console.log('🔑 Ruta de registro de administradores: /admin-register');
+     console.log('🔄 Sistema MULTI-USUARIO de asistencias activado');
+    console.log('📊 Nuevo sistema de asistencias:');
+    console.log('   - TODOS los usuarios pueden registrar para otros');
+    console.log('   - Solo ADMIN pueden ver reportes completos');
+    console.log('   - Registro de quién realizó cada registro');
+    console.log('   - Selector de usuarios disponible para todos');
     console.log('🔄 Sistema de gestión de usuarios en página principal activado');
     console.log('📊 Nuevas rutas de administración:');
     console.log('   - GET /api/admin/usuarios/lista');
     console.log('   - PUT /api/admin/usuarios/:id/rol');
     console.log('   - DELETE /api/admin/usuarios/:id');
+    console.log('📸 Sistema de asistencias MULTI-USUARIO activado');
+    console.log('   - POST /api/asistencias/registrar-multi (solo admin)');
+    console.log('   - POST /api/asistencias/registrar');
+    console.log('   - GET /api/asistencias/reporte (solo admin ve todos)');
+    console.log('   - GET /api/asistencias/mis-asistencias (para todos)');
+    console.log('   - GET /api/usuarios/activos (para selector multi-usuario)');
+    console.log('   - GET /api/asistencias/dashboard-estadisticas (diferenciado por rol)');
     console.log('===============================================');
     console.log(`🚀 Servidor ejecutándose en: http://localhost:${PORT}`);
     console.log('===============================================');

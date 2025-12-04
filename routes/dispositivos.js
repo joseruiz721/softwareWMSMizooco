@@ -83,10 +83,10 @@ router.get("/:tipo/:id", async (req, res) => {
 });
 
 // ==============================================
-// RUTAS POST - CREAR DISPOSITIVOS (FALTANTE)
+// RUTAS POST - CREAR DISPOSITIVOS
 // ==============================================
 
-// Crear nuevo dispositivo - RUTA CORREGIDA
+// Crear nuevo dispositivo
 router.post("/:tipo", async (req, res) => {
     const { tipo } = req.params;
     
@@ -105,13 +105,13 @@ router.post("/:tipo", async (req, res) => {
         const valores = [];
         const placeholders = [];
         
-        // ✅ CORRECCIÓN: Validar campos requeridos específicos
+        // Campos requeridos específicos (serial ya no es obligatorio)
         const camposRequeridos = {
-            'ordenadores': ['ubicacion', 'fecha_ingreso', 'serial'],
-            'access_point': ['ubicacion', 'serial', 'fecha_ingreso'],
-            'readers': ['ubicacion', 'fecha_ingreso', 'serial'],
-            'etiquetadoras': ['ubicacion', 'fecha_ingreso', 'serial'],
-            'tablets': ['ubicacion', 'fecha_ingreso', 'serial'],
+            'ordenadores': ['ubicacion', 'fecha_ingreso'],
+            'access_point': ['ubicacion', 'fecha_ingreso'],
+            'readers': ['ubicacion', 'fecha_ingreso'],
+            'etiquetadoras': ['ubicacion', 'fecha_ingreso'],
+            'tablets': ['ubicacion', 'fecha_ingreso'],
             'lectores_qr': ['ubicacion', 'fecha_ingreso', 'modelo']
         }[tipo] || ['ubicacion', 'fecha_ingreso'];
 
@@ -127,28 +127,43 @@ router.post("/:tipo", async (req, res) => {
 
         // Procesar campos específicos del tipo de dispositivo
         tiposDispositivos[tipo].campos.forEach((campo) => {
-            if (req.body[campo] !== undefined && req.body[campo] !== null && req.body[campo] !== '') {
-                campos.push(campo);
-                
-                // Convertir valores booleanos
-                if (campo === 'activo') {
+            if (req.body[campo] !== undefined && req.body[campo] !== null) {
+                // Manejar campo serial especial
+                if (campo === 'serial') {
+                    const valorSerial = req.body[campo];
+                    
+                    // Si el serial está vacío o es nulo, no lo agregamos
+                    if (valorSerial === '' || valorSerial === null) {
+                        return;
+                    }
+                    
+                    const serialNormalizado = valorSerial.toString().trim().toLowerCase();
+                    
+                    // Si el valor es "especial", convertirlo a NULL
+                    if (serialNormalizado === 'ninguno' || serialNormalizado === 'no aplica' || 
+                        serialNormalizado === 'n/a' || serialNormalizado === 'sin serial' || 
+                        serialNormalizado === 'no tiene') {
+                        // Para NULL, no agregamos el campo (la BD usará NULL por defecto)
+                        return;
+                    }
+                    
+                    campos.push(campo);
+                    valores.push(req.body[campo]);
+                } else if (campo === 'activo_fijo' && (req.body[campo] === '' || req.body[campo] === null)) {
+                    // Para activo_fijo vacío, no lo agregamos
+                    return;
+                } else if (campo === 'activo') {
+                    // Convertir valores booleanos
+                    campos.push(campo);
                     valores.push(req.body[campo] === 'true' || req.body[campo] === true);
                 } else {
+                    campos.push(campo);
                     valores.push(req.body[campo]);
                 }
             }
         });
 
-        // ✅ CORRECCIÓN: Manejar activo_fijo vacío
-        if (req.body.activo_fijo === '' || req.body.activo_fijo === null) {
-            const activoFijoIndex = campos.indexOf('activo_fijo');
-            if (activoFijoIndex !== -1) {
-                campos.splice(activoFijoIndex, 1);
-                valores.splice(activoFijoIndex, 1);
-            }
-        }
-
-        // ✅ CORRECCIÓN: Validar que tenemos campos para insertar
+        // Validar que tenemos campos para insertar
         if (campos.length === 0) {
             return res.status(400).json({
                 success: false,
@@ -156,17 +171,27 @@ router.post("/:tipo", async (req, res) => {
             });
         }
 
-        // ✅ CORRECCIÓN: Verificar duplicados para etiquetadoras
-        if (tipo === 'etiquetadoras' && req.body.serial) {
+        // Validar duplicados solo si hay serial válido
+        const hasSerial = req.body.serial && req.body.serial.trim() !== '';
+        const serialValue = hasSerial ? req.body.serial.toString().trim().toLowerCase() : null;
+        
+        // Solo validar duplicados si hay un serial que no sea "especial"
+        if (hasSerial && serialValue && 
+            serialValue !== 'ninguno' && 
+            serialValue !== 'no aplica' && 
+            serialValue !== 'n/a' &&
+            serialValue !== 'sin serial' &&
+            serialValue !== 'no tiene') {
+            
             const serialExistente = await queryAsync(
-                `SELECT id FROM etiquetadoras WHERE serial = $1`,
-                [req.body.serial]
+                `SELECT id FROM ${tableName} WHERE LOWER(TRIM(serial)) = $1`,
+                [serialValue]
             );
             
             if (serialExistente.length > 0) {
                 return res.status(400).json({
                     success: false,
-                    message: "Ya existe una etiquetadora con este número de serie."
+                    message: "Ya existe un dispositivo con este número de serie."
                 });
             }
         }
@@ -202,11 +227,16 @@ router.post("/:tipo", async (req, res) => {
     } catch (error) {
         console.error(`❌ Error al registrar ${tipo}:`, error);
         
-        // ✅ CORRECCIÓN: Manejar errores específicos de duplicados
-        if (error.code === '23505') { // Violación de unique constraint
+        // Manejar errores específicos de duplicados
+        if (error.code === '23505') {
             return res.status(400).json({
                 success: false,
                 message: "Ya existe un dispositivo con estos datos (serial o activo fijo duplicado)."
+            });
+        } else if (error.code === '23502') {
+            return res.status(400).json({
+                success: false,
+                message: `Error: El campo '${error.column}' no puede ser nulo.`
             });
         }
         
@@ -246,6 +276,9 @@ router.put("/:tipo/:id", async (req, res) => {
             });
         }
 
+        // Obtener datos actuales para validación
+        const dispositivoActual = rows[0];
+        
         const updates = [];
         const values = [];
         let paramCount = 1;
@@ -253,6 +286,34 @@ router.put("/:tipo/:id", async (req, res) => {
         // Usar los campos definidos en tiposDispositivos
         tiposDispositivos[tipo].campos.forEach(campo => {
             if (req.body.hasOwnProperty(campo) && campo !== 'id') {
+                // Manejar campo serial especial
+                if (campo === 'serial') {
+                    const valorSerial = req.body[campo];
+                    
+                    // Si el serial está vacío, nulo o es un valor especial
+                    if (valorSerial === '' || valorSerial === null) {
+                        updates.push(`${campo} = NULL`);
+                        return;
+                    }
+                    
+                    const serialNormalizado = valorSerial.toString().trim().toLowerCase();
+                    
+                    // Si el valor es "especial", establecer a NULL
+                    if (serialNormalizado === 'ninguno' || serialNormalizado === 'no aplica' || 
+                        serialNormalizado === 'n/a' || serialNormalizado === 'sin serial' || 
+                        serialNormalizado === 'no tiene') {
+                        updates.push(`${campo} = NULL`);
+                        return;
+                    }
+                    
+                    // Si tiene un valor válido
+                    updates.push(`${campo} = $${paramCount}`);
+                    values.push(valorSerial);
+                    paramCount++;
+                    return;
+                }
+                
+                // Para otros campos
                 updates.push(`${campo} = $${paramCount}`);
                 
                 // Manejar diferentes tipos de datos
@@ -273,6 +334,30 @@ router.put("/:tipo/:id", async (req, res) => {
                 success: false,
                 message: "No se proporcionaron campos válidos para actualizar."
             });
+        }
+
+        // Validar duplicados de serial antes de actualizar
+        if (req.body.serial && req.body.serial !== '' && req.body.serial !== null) {
+            const serialNormalizado = req.body.serial.toString().trim().toLowerCase();
+            
+            // Solo validar si no es un valor "especial"
+            if (serialNormalizado !== 'ninguno' && serialNormalizado !== 'no aplica' && 
+                serialNormalizado !== 'n/a' && serialNormalizado !== 'sin serial' && 
+                serialNormalizado !== 'no tiene') {
+                
+                // Verificar si hay otro dispositivo con el mismo serial
+                const serialExistente = await queryAsync(
+                    `SELECT id FROM ${tableName} WHERE LOWER(TRIM(serial)) = $1 AND id != $2`,
+                    [serialNormalizado, id]
+                );
+                
+                if (serialExistente.length > 0) {
+                    return res.status(400).json({
+                        success: false,
+                        message: "Ya existe otro dispositivo con este número de serie."
+                    });
+                }
+            }
         }
 
         // Agregar fecha de actualización si el campo existe
@@ -300,6 +385,20 @@ router.put("/:tipo/:id", async (req, res) => {
 
     } catch (error) {
         console.error(`❌ Error al actualizar ${tipo}:`, error);
+        
+        // Manejar errores específicos
+        if (error.code === '23505') {
+            return res.status(400).json({
+                success: false,
+                message: "Ya existe un dispositivo con estos datos (serial o activo fijo duplicado)."
+            });
+        } else if (error.code === '23502') {
+            return res.status(400).json({
+                success: false,
+                message: `Error: El campo '${error.column}' no puede ser nulo.`
+            });
+        }
+        
         return res.status(500).json({
             success: false,
             message: `Error al actualizar el ${tipo}.`,
