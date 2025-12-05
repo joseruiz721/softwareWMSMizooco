@@ -126,7 +126,7 @@ Si ves esto = **¡TODO FUNCIONA!** 🎉
 cd "e:\TECNOLOGO FICHA 2879665\...\control_acceso"
 
 # Ejecuta (reemplaza con tu DATABASE_URL):
-psql "postgresql://postgres:RSEWAWkdcDAFHrmwxmctDVtZIFAVvopp@postgres--mqk.railway.internal:5432/railway" -f schema.sql
+psql "postgresql://postgres:RSEWAWkdcDAFHrmwxmctDVtZIFAVvopp@postgres.railway.internal:5432/railway" -f schema.sql
 ```
 
 **Opción B: Usar DBeaver o pgAdmin**
