@@ -77,7 +77,7 @@ router.get("/solicitar-reset", (req, res) => {
 
 // Login de usuarios
 router.post("/login", async (req, res) => {
-    const { correo, pass } = req.body;
+    const { correo, pass, remember } = req.body;
     
     console.log('🔐 Intento de login para:', correo);
     
@@ -138,11 +138,22 @@ router.post("/login", async (req, res) => {
         req.session.user = userSessionData;
         req.session.userId = usuario.id;
         
-        // Generar token JWT
+        // Si el usuario solicitó 'recordar sesión', ampliar la duración de la cookie y del token
+        const rememberFlag = !!remember;
+        if (rememberFlag) {
+            // Establecer cookie persistente por 30 días
+            req.session.cookie.maxAge = 30 * 24 * 60 * 60 * 1000; // 30 días
+        } else {
+            // Mantener comportamiento por defecto (24 horas)
+            req.session.cookie.maxAge = 24 * 60 * 60 * 1000; // 24 horas
+        }
+
+        // Generar token JWT (más largo si recuerda)
+        const tokenExpiry = rememberFlag ? '30d' : '24h';
         const token = jwt.sign(
             { userId: usuario.id },
             process.env.JWT_SECRET || 'fallback_secret',
-            { expiresIn: '24h' }
+            { expiresIn: tokenExpiry }
         );
         
         console.log('✅ Credenciales correctas para:', usuario.nombre, '- Rol:', usuario.role);

@@ -8,6 +8,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const loginForm = document.getElementById('loginForm');
     const emailInput = document.getElementById('email');
     const passwordInput = document.getElementById('password');
+    const rememberCheckbox = document.getElementById('rememberMe');
     const togglePasswordButton = document.getElementById('togglePasswordButton');
     const loginButton = document.getElementById('loginButton');
     const errorMessage = document.getElementById('error-message');
@@ -51,6 +52,10 @@ document.addEventListener('DOMContentLoaded', function() {
             correo: emailInput.value.trim(),
             pass: passwordInput.value.trim()
         };
+        // Incluir flag de "recordar sesión" si existe el checkbox
+        if (rememberCheckbox) {
+            formData.remember = !!rememberCheckbox.checked;
+        }
 
         // Validación básica
         if (!formData.correo || !formData.pass) {
