@@ -169,13 +169,16 @@ router.post("/login", async (req, res) => {
             }
             
             console.log('✅ Sesión guardada exitosamente');
+            console.log('🔒 session.cookie.maxAge =', req.session.cookie.maxAge);
             
+            // Nota: se incluye temporalmente sessionMaxAge en la respuesta para verificación
             return res.json({ 
                 success: true, 
                 message: "Login exitoso",
                 redirect: "/dashboard",
                 user: userSessionData,
-                token: token
+                token: token,
+                sessionMaxAge: req.session.cookie.maxAge
             });
         });
         
