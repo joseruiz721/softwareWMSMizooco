@@ -267,6 +267,17 @@
     border-left: 3px solid #007bff;
 }
 
+/* Variantes extendidas para nuevas franjas */
+.turno-manana-extended {
+    background-color: #bfeafb !important; /* Azul más suave para franja extendida */
+    border-left: 3px solid #0d95c0;
+}
+
+.turno-tarde-extended {
+    background-color: #fff7db !important; /* Amarillo suave para franja extendida */
+    border-left: 3px solid #ffb300;
+}
+
 /* Select de turnos compacto */
 .turno-select {
     width: 100%;

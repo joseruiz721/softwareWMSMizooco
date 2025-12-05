@@ -357,11 +357,11 @@ class HorariosCalendario {
                     <span>5am-12pm</span>
                 </div>
                 <div class="leyenda-item">
-                    <div class="leyenda-color turno-manana"></div>
+                    <div class="leyenda-color turno-manana-extended"></div>
                     <span>5am-1:30pm</span>
                 </div>
                 <div class="leyenda-item">
-                    <div class="leyenda-color turno-tarde"></div>
+                    <div class="leyenda-color turno-tarde-extended"></div>
                     <span>1:30pm-10pm</span>
                 </div>
                 <div class="leyenda-item">
@@ -473,8 +473,8 @@ class HorariosCalendario {
     static obtenerClaseTurno(turno) {
         const clases = {
             '5am-12pm': 'turno-manana',
-            '5am-1:30pm': 'turno-manana',
-            '1:30pm-10pm': 'turno-tarde',
+            '5am-1:30pm': 'turno-manana-extended',
+            '1:30pm-10pm': 'turno-tarde-extended',
             '3pm-10pm': 'turno-tarde',
             '10pm-5am': 'turno-noche',
             'Apoyo': 'turno-apoyo', 
