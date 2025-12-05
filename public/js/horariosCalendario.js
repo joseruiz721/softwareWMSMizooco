@@ -329,6 +329,8 @@ class HorariosCalendario {
                                 <select class="turno-select" data-tecnico="${tecnico.nombre || `Técnico ${filaIndex + 1}`}" style="display: none; font-size: 16px;">
                                     <option value="">-</option>
                                     <option value="5am-12pm" ${datosFila.turno === '5am-12pm' ? 'selected' : ''}>5am-12pm</option>
+                                    <option value="5am-1:30pm" ${datosFila.turno === '5am-1:30pm' ? 'selected' : ''}>5am-1:30pm</option>
+                                    <option value="1:30pm-10pm" ${datosFila.turno === '1:30pm-10pm' ? 'selected' : ''}>1:30pm-10pm</option>
                                     <option value="3pm-10pm" ${datosFila.turno === '3pm-10pm' ? 'selected' : ''}>3pm-10pm</option>
                                     <option value="10pm-5am" ${datosFila.turno === '10pm-5am' ? 'selected' : ''}>10pm-5am</option>
                                     <option value="Apoyo" ${datosFila.turno === 'Apoyo' ? 'selected' : ''}>Apoyo</option>
@@ -353,6 +355,14 @@ class HorariosCalendario {
                 <div class="leyenda-item">
                     <div class="leyenda-color turno-manana"></div>
                     <span>5am-12pm</span>
+                </div>
+                <div class="leyenda-item">
+                    <div class="leyenda-color turno-manana"></div>
+                    <span>5am-1:30pm</span>
+                </div>
+                <div class="leyenda-item">
+                    <div class="leyenda-color turno-tarde"></div>
+                    <span>1:30pm-10pm</span>
                 </div>
                 <div class="leyenda-item">
                     <div class="leyenda-color turno-tarde"></div>
@@ -463,6 +473,8 @@ class HorariosCalendario {
     static obtenerClaseTurno(turno) {
         const clases = {
             '5am-12pm': 'turno-manana',
+            '5am-1:30pm': 'turno-manana',
+            '1:30pm-10pm': 'turno-tarde',
             '3pm-10pm': 'turno-tarde',
             '10pm-5am': 'turno-noche',
             'Apoyo': 'turno-apoyo', 
@@ -475,6 +487,8 @@ class HorariosCalendario {
     static obtenerTextoMostrado(turno) {
         const textos = {
             '5am-12pm': '5-12',
+            '5am-1:30pm': '5-1:30',
+            '1:30pm-10pm': '1:30-10',
             '3pm-10pm': '3-10', 
             '10pm-5am': '10-5',
             'Apoyo': 'Apoyo',
