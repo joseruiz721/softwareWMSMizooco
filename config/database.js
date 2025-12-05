@@ -2,13 +2,36 @@ const { Pool } = require('pg');
 const session = require('express-session');
 const pgSession = require('connect-pg-simple')(session);
 
-// Configuración de la base de datos
-const pool = new Pool({
-    user: process.env.DB_USER || 'postgres',
-    host: process.env.DB_HOST || 'localhost',
-    database: process.env.DB_NAME || 'control_acceso',
-    password: process.env.DB_PASSWORD || '09262405',
-    port: process.env.DB_PORT || 5432,
+// Configuración de la base de datos - Soporte para Railway DATABASE_URL
+const pool = new Pool(
+    process.env.DATABASE_URL 
+        ? {
+            connectionString: process.env.DATABASE_URL,
+            ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+            idleTimeoutMillis: 30000,
+            connectionTimeoutMillis: 2000,
+            max: 20,
+        }
+        : {
+            user: process.env.DB_USER || 'postgres',
+            host: process.env.DB_HOST || 'localhost',
+            database: process.env.DB_NAME || 'control_acceso',
+            password: process.env.DB_PASSWORD,
+            port: process.env.DB_PORT || 5432,
+            ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+            idleTimeoutMillis: 30000,
+            connectionTimeoutMillis: 2000,
+            max: 20,
+        }
+);
+
+// Manejo de errores de conexión
+pool.on('error', (err) => {
+    console.error('Error en pool de PostgreSQL:', err);
+});
+
+pool.on('connect', () => {
+    console.log('✅ Conectado a PostgreSQL exitosamente');
 });
 
 // Store para sesiones

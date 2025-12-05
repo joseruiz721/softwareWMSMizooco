@@ -1127,6 +1127,24 @@ app.use((error, req, res, next) => {
 // INICIAR EL SERVIDOR
 // ==============================================
 
+// ==============================================
+// VALIDACIÓN DE CONEXIÓN A BD ANTES DE INICIAR
+// ==============================================
+async function validateDatabaseConnection() {
+    try {
+        const result = await databaseConfig.queryAsync('SELECT NOW()');
+        console.log('✅ Conexión a PostgreSQL verificada exitosamente');
+        return true;
+    } catch (err) {
+        console.error('❌ ERROR: No se puede conectar a la base de datos');
+        console.error('Error:', err.message);
+        console.error('\n📋 Verifica las variables de entorno:');
+        console.error('   - DATABASE_URL (para Railway)');
+        console.error('   - O: DB_USER, DB_HOST, DB_PASSWORD, DB_PORT, DB_NAME');
+        return false;
+    }
+}
+
 const PORT = process.env.PORT || 3000;
 
 // Verificar configuración crítica antes de iniciar
@@ -1147,7 +1165,15 @@ function validateConfig() {
     }
 }
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
+    // Validar conexión a BD primero
+    const dbConnected = await validateDatabaseConnection();
+    
+    if (!dbConnected) {
+        console.error('\n⚠️  ADVERTENCIA: La aplicación está corriendo pero sin conexión a BD');
+        console.error('Las rutas que requieren BD fallarán hasta que se resuelva la conexión\n');
+    }
+    
     validateConfig();
     
     Logger.startup(PORT, process.env.NODE_ENV || 'development');
