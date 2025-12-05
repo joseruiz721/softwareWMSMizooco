@@ -228,12 +228,12 @@ INSERT INTO repuestos (nombre, codigo, cantidad, stock_minimo, ubicacion, fecha_
 ('Mouse Óptico', 'MS-OPT', 40, 15, 'Almacén A', CURRENT_DATE)
 ON CONFLICT (codigo) DO NOTHING;
 
--- Insertar algunos técnicos de ejemplo
-INSERT INTO tecnicos_horarios (nombre, color) VALUES
-('Juan Pérez', '#FF5733'),
-('María García', '#33FF57'),
-('Carlos López', '#3357FF'),
-('Ana Martínez', '#F333FF')
+-- Insertar técnicos registrados (reales)
+INSERT INTO tecnicos_horarios (nombre, color, activo) VALUES
+('José Ruiz', '#007bff', true),
+('Juan Vargas', '#28a745', true),
+('Richard Prado', '#dc3545', true),
+('Adriana B.', '#ffc107', true)
 ON CONFLICT DO NOTHING;
 
 -- Crear índices para mejor performance
