@@ -730,6 +730,8 @@ class HorariosCalendario {
                             <select class="turno-select" data-tecnico="${tecnico.nombre || `Técnico ${filaIndex + 1}`}" style="display: none; font-size: 16px;">
                                 <option value="">-</option>
                                 <option value="5am-12pm" ${datosFila.turno === '5am-12pm' ? 'selected' : ''}>5am-12pm</option>
+                                <option value="5am-1:30pm" ${datosFila.turno === '5am-1:30pm' ? 'selected' : ''}>5am-1:30pm</option>
+                                <option value="1:30pm-10pm" ${datosFila.turno === '1:30pm-10pm' ? 'selected' : ''}>1:30pm-10pm</option>
                                 <option value="3pm-10pm" ${datosFila.turno === '3pm-10pm' ? 'selected' : ''}>3pm-10pm</option>
                                 <option value="10pm-5am" ${datosFila.turno === '10pm-5am' ? 'selected' : ''}>10pm-5am</option>
                                 <option value="Apoyo" ${datosFila.turno === 'Apoyo' ? 'selected' : ''}>Apoyo</option>
