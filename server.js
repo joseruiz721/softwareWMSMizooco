@@ -1118,11 +1118,17 @@ app.get('/js/admin-users.js', (req, res) => {
 
 // Middleware para rutas no encontradas
 app.use((req, res) => {
-    Logger.warn('Ruta no encontrada', { 
-        metodo: req.method, 
-        ruta: req.path,
-        session: req.sessionID ? 'Activa' : 'No activa'
-    });
+    // No loguear rutas de assets o well-known para evitar ruido en consola
+    const silentPrefixes = ['/.well-known', '/css/', '/js/', '/uploads/', '/favicon.ico'];
+    const isAsset = silentPrefixes.some(p => req.path.startsWith(p));
+
+    if (!isAsset) {
+        Logger.warn('Ruta no encontrada', { 
+            metodo: req.method, 
+            ruta: req.path,
+            session: req.sessionID ? 'Activa' : 'No activa'
+        });
+    }
     
     // Si es una API, devolver JSON
     if (req.path.startsWith('/api/')) {

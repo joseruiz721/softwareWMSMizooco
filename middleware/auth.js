@@ -1,16 +1,17 @@
 // middleware/auth.js - PERMISOS CORREGIDOS
 const jwt = require('jsonwebtoken');
 const databaseConfig = require('../config/database');
+const Logger = require('../config/logger');
 
 // Middleware de autenticación por sesión
 function requireAuth(req, res, next) {
-    console.log('🔐 Verificando autenticación para:', req.path);
+    Logger.debug('🔐 Verificando autenticación para: ' + req.path);
     
     if (req.session && req.session.user) {
-        console.log('✅ Usuario autenticado:', req.session.user.nombre);
+        Logger.info('✅ Usuario autenticado: ' + req.session.user.nombre);
         next();
     } else {
-        console.log('❌ Usuario no autenticado, redirigiendo...');
+        Logger.warn('❌ Usuario no autenticado, redirigiendo...');
         
         // Si es una petición API, devolver error JSON
         if (req.path.startsWith('/api/')) {
@@ -27,7 +28,7 @@ function requireAuth(req, res, next) {
 
 function optionalAuth(req, res, next) {
     if (req.session && req.session.user) {
-        console.log('✅ Usuario autenticado (opcional):', req.session.user.nombre);
+        Logger.debug('✅ Usuario autenticado (opcional): ' + req.session.user.nombre);
         req.isAuthenticated = true;
     } else {
         req.isAuthenticated = false;
@@ -41,10 +42,10 @@ const authenticateToken = async (req, res, next) => {
     const token = authHeader && authHeader.split(' ')[1];
 
     if (!token) {
-        console.log('❌ Token no proporcionado para ruta:', req.path);
+        Logger.warn('❌ Token no proporcionado para ruta: ' + req.path);
         
         if (isOptionalRoute(req.path)) {
-            console.log('🟡 Ruta opcional, continuando sin token...');
+            Logger.debug('🟡 Ruta opcional, continuando sin token...');
             return next();
         }
         
@@ -64,7 +65,7 @@ const authenticateToken = async (req, res, next) => {
         );
 
         if (userQuery.length === 0) {
-            console.log('❌ Usuario no encontrado en BD para token');
+            Logger.warn('❌ Usuario no encontrado en BD para token');
             return res.status(401).json({ 
                 success: false,
                 message: 'Usuario no encontrado',
@@ -73,13 +74,13 @@ const authenticateToken = async (req, res, next) => {
         }
 
         req.user = userQuery[0];
-        console.log('✅ Usuario autenticado (JWT):', req.user?.nombre || 'Unknown', '- Rol:', req.user?.role || 'None', '- Ruta:', req.path);
+        Logger.info('✅ Usuario autenticado (JWT): ' + (req.user?.nombre || 'Unknown') + ' - Rol: ' + (req.user?.role || 'None') + ' - Ruta: ' + req.path);
         next();
     } catch (error) {
-        console.error('❌ Error en autenticación JWT:', error.message);
+        Logger.error('❌ Error en autenticación JWT:', { message: error.message });
         
         if (isOptionalRoute(req.path)) {
-            console.log('🟡 Ruta opcional, continuando sin autenticación...');
+            Logger.debug('🟡 Ruta opcional, continuando sin autenticación...');
             return next();
         }
         
@@ -135,10 +136,10 @@ const optionalToken = async (req, res, next) => {
 
         if (userQuery.length > 0) {
             req.user = userQuery[0];
-            console.log('✅ Usuario verificado (opcional):', req.user?.nombre || 'Unknown');
+            Logger.debug('✅ Usuario verificado (opcional): ' + (req.user?.nombre || 'Unknown'));
         }
     } catch (error) {
-        console.log('🟡 Token inválido en verificación opcional:', error.message);
+        Logger.debug('🟡 Token inválido en verificación opcional: ' + error.message);
     }
     
     next();
@@ -159,10 +160,10 @@ function requireAdmin(req, res, next) {
     if (!requiresAdmin) {
         // Para rutas que no son de gestión de usuarios, cualquier usuario autenticado puede acceder
         if (req.session && req.session.user) {
-            console.log('✅ Acceso permitido para usuario regular:', req.session.user?.nombre || 'Unknown');
+            Logger.debug('✅ Acceso permitido para usuario regular: ' + (req.session.user?.nombre || 'Unknown'));
             return next();
         } else if (req.user) {
-            console.log('✅ Acceso permitido para usuario regular (JWT):', req.user?.nombre || 'Unknown');
+            Logger.debug('✅ Acceso permitido para usuario regular (JWT): ' + (req.user?.nombre || 'Unknown'));
             return next();
         } else {
             return res.status(401).json({ 
@@ -176,7 +177,7 @@ function requireAdmin(req, res, next) {
     // Para rutas de gestión de usuarios, requerir admin
         if (req.session && req.session.user) {
         if (req.session.user.role !== 'admin') {
-            console.log('❌ Intento de acceso no autorizado - Sesión:', req.session.user?.nombre || 'Unknown', 'Rol:', req.session.user?.role || 'None');
+            Logger.warn('❌ Intento de acceso no autorizado - Sesión: ' + (req.session.user?.nombre || 'Unknown') + ' Rol: ' + (req.session.user?.role || 'None'));
             
             if (req.path.startsWith('/api/')) {
                 return res.status(403).json({ 
@@ -189,23 +190,23 @@ function requireAdmin(req, res, next) {
             req.session.error = 'No tienes permisos de administrador para acceder a esta página';
             return res.redirect('/dashboard');
         }
-        console.log('✅ Acceso admin autorizado - Sesión:', req.session.user?.nombre || 'Unknown');
+        Logger.info('✅ Acceso admin autorizado - Sesión: ' + (req.session.user?.nombre || 'Unknown'));
         next();
     }
     else if (req.user) {
         if (req.user.role !== 'admin') {
-            console.log('❌ Intento de acceso no autorizado - JWT:', req.user?.nombre || 'Unknown', 'Rol:', req.user?.role || 'None');
+            Logger.warn('❌ Intento de acceso no autorizado - JWT: ' + (req.user?.nombre || 'Unknown') + ' Rol: ' + (req.user?.role || 'None'));
             return res.status(403).json({ 
                 success: false,
                 message: 'Se requieren privilegios de administrador para esta acción',
                 error: 'ADMIN_REQUIRED'
             });
         }
-        console.log('✅ Acceso admin autorizado - JWT:', req.user?.nombre || 'Unknown');
+        Logger.info('✅ Acceso admin autorizado - JWT: ' + (req.user?.nombre || 'Unknown'));
         next();
     }
     else {
-        console.log('❌ Usuario no autenticado en requireAdmin');
+        Logger.warn('❌ Usuario no autenticado en requireAdmin');
         return res.status(401).json({ 
             success: false,
             message: 'No autenticado',
@@ -221,7 +222,7 @@ function requireRole(roles) {
                         (req.user) ? req.user.role : null;
         
         if (!userRole || !roles.includes(userRole)) {
-            console.log('❌ Intento de acceso con rol insuficiente:', userRole, 'Requiere:', roles);
+            Logger.warn('❌ Intento de acceso con rol insuficiente: ' + userRole + ' Requiere: ' + roles);
             
             if (req.path.startsWith('/api/')) {
                 return res.status(403).json({ 
@@ -235,7 +236,7 @@ function requireRole(roles) {
             return res.redirect('/dashboard');
         }
         
-        console.log('✅ Acceso autorizado - Rol:', userRole, 'para ruta:', req.path);
+        Logger.info('✅ Acceso autorizado - Rol: ' + userRole + ' para ruta: ' + req.path);
         next();
     };
 }
@@ -266,7 +267,7 @@ function checkPermission(operation) {
         ];
         
         if (adminOnlyOperations.includes(operation) && userRole !== 'admin') {
-            console.log('❌ Intento de operación no autorizada:', operation, 'por usuario con rol:', userRole);
+            Logger.warn('❌ Intento de operación no autorizada: ' + operation + ' por usuario con rol: ' + userRole);
             
             if (req.path.startsWith('/api/')) {
                 return res.status(403).json({ 
@@ -279,7 +280,7 @@ function checkPermission(operation) {
             return res.status(403).send('Operación no permitida');
         }
         
-        console.log('✅ Permiso concedido para operación:', operation, '- Rol:', userRole);
+        Logger.info('✅ Permiso concedido para operación: ' + operation + ' - Rol: ' + userRole);
         next();
     };
 }
@@ -288,7 +289,7 @@ function checkPermission(operation) {
 async function enrichSessionWithUserData(req, res, next) {
     if (req.session && req.session.user && req.session.user.id) {
         try {
-            console.log('🔄 Enriqueciendo sesión con datos de BD para usuario:', req.session.user.id);
+            Logger.info('🔄 Enriqueciendo sesión con datos de BD para usuario: ' + req.session.user.id);
             
             const userQuery = await databaseConfig.queryAsync(
                 'SELECT id, cedula, nombre, correo, role FROM usuarios WHERE id = $1',
@@ -300,7 +301,7 @@ async function enrichSessionWithUserData(req, res, next) {
                 req.session.user.correo = userQuery[0].correo;
                 req.session.user.nombre = userQuery[0].nombre;
                 req.session.user.cedula = userQuery[0].cedula;
-                console.log('✅ Sesión enriquecida con datos de BD - Rol:', req.session.user.role);
+                Logger.info('✅ Sesión enriquecida con datos de BD - Rol: ' + req.session.user.role);
             } else {
                 console.warn('⚠️ Usuario no encontrado en BD para enriquecer sesión');
                 req.session.destroy((err) => {
@@ -321,7 +322,7 @@ function authLogger(req, res, next) {
     const user = req.session?.user || req.user;
     const authType = req.session?.user ? 'SESSION' : (req.user ? 'JWT' : 'NONE');
     
-    console.log(`🔐 [${authType}] ${req.method} ${req.path} - User: ${user?.nombre || 'Anonymous'} - Role: ${user?.role || 'None'}`);
+    Logger.http(req.method, req.path, req.sessionID || 'NoSession', user?.nombre ? user : null);
     next();
 }
 
@@ -358,7 +359,7 @@ const checkAuthStatus = async (req, res, next) => {
                 return next();
             }
         } catch (error) {
-            console.log('🟡 Token JWT inválido en checkAuthStatus');
+            Logger.debug('🟡 Token JWT inválido en checkAuthStatus');
         }
     }
     

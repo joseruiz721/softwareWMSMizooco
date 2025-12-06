@@ -30,8 +30,12 @@ pool.on('error', (err) => {
     console.error('Error en pool de PostgreSQL:', err);
 });
 
+let _hasLoggedConnected = false;
 pool.on('connect', () => {
-    console.log('✅ Conectado a PostgreSQL exitosamente');
+    if (!_hasLoggedConnected) {
+        console.log('✅ Conectado a PostgreSQL exitosamente');
+        _hasLoggedConnected = true;
+    }
 });
 
 // Store para sesiones
