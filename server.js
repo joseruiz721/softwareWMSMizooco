@@ -564,10 +564,16 @@ app.delete('/api/admin/usuarios/:id', authenticateToken, requireAdmin, async (re
             administrador: req.user?.nombre || 'Unknown',
             usuarioId: req.params.id
         });
-        res.status(500).json({
+        // En modo desarrollo devolver detalle del error para facilitar debugging
+        const responseBody = {
             success: false,
             message: 'Error al eliminar el usuario'
-        });
+        };
+        if (process.env.NODE_ENV === 'development' || process.env.DEBUG_ERRORS === 'true') {
+            responseBody.error = error.message;
+            responseBody.stack = error.stack;
+        }
+        res.status(500).json(responseBody);
     }
 });
 
