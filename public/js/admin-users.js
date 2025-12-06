@@ -152,32 +152,51 @@ class AdminUsersManager {
     /**
      * 📋 Cargar lista de usuarios
      */
-    async loadUsers() {
-        try {
-            console.log('🔄 Cargando lista de usuarios...');
-            
-            const response = await fetch('/api/admin/usuarios/lista');
-            
-            if (!response.ok) {
-                throw new Error(`Error ${response.status}: ${response.statusText}`);
-            }
-            
-            const result = await response.json();
-            
-            if (result.success) {
-                this.users = result.data;
-                console.log(`✅ ${this.users.length} usuarios cargados correctamente`);
-                return true;
-            } else {
-                throw new Error(result.message || 'Error al cargar usuarios');
-            }
-        } catch (error) {
-            console.error('❌ Error cargando usuarios:', error);
-            this.showNotification('Error al cargar usuarios: ' + error.message, 'error');
-            return false;
+   // En la función loadUsers de admin-users.js
+async loadUsers() {
+    try {
+        console.log('🔄 Cargando lista de usuarios...');
+        
+        const response = await fetch('/api/admin/usuarios/lista');
+        
+        if (!response.ok) {
+            throw new Error(`Error ${response.status}: ${response.statusText}`);
         }
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            this.users = result.data;
+            console.log(`✅ ${this.users.length} usuarios ACTIVOS cargados`);
+            
+            // También cargar inactivos si quieres mostrarlos
+            await this.loadInactiveUsers();
+            
+            return true;
+        } else {
+            throw new Error(result.message || 'Error al cargar usuarios');
+        }
+    } catch (error) {
+        console.error('❌ Error cargando usuarios:', error);
+        this.showNotification('Error al cargar usuarios: ' + error.message, 'error');
+        return false;
     }
+}
 
+async loadInactiveUsers() {
+    try {
+        const response = await fetch('/api/admin/usuarios/inactivos');
+        if (response.ok) {
+            const result = await response.json();
+            if (result.success) {
+                console.log(`📋 ${result.data.length} usuarios INACTIVOS cargados`);
+                this.inactiveUsers = result.data;
+            }
+        }
+    } catch (error) {
+        console.log('ℹ️ No se pudieron cargar usuarios inactivos:', error.message);
+    }
+}
     /**
      * 🎨 Mostrar modal de gestión de usuarios
      */
@@ -462,37 +481,84 @@ class AdminUsersManager {
         }
     }
 
-    /**
-     * 🗑️ Eliminar usuario
-     */
-    async deleteUser(userId) {
-        const user = this.users.find(u => u.id === parseInt(userId));
-        if (!user) {
-            this.showNotification('Usuario no encontrado', 'error');
+async deleteUser(userId) {
+    const user = this.users.find(u => u.id === parseInt(userId));
+    if (!user) {
+        this.showNotification('Usuario no encontrado', 'error');
+        return;
+    }
+
+    try {
+        console.log(`🗑️ Eliminando usuario: ${user.nombre}`);
+        
+        const confirmation = confirm(
+            `¿Estás seguro de que quieres ELIMINAR al usuario "${user.nombre}"?\n\n` +
+            `📧 Correo: ${user.correo}\n` +
+            `👑 Rol: ${user.role === 'admin' ? 'Administrador' : 'Usuario'}\n\n` +
+            `⚠️ IMPORTANTE:\n` +
+            `• El usuario será DESACTIVADO (soft delete)\n` +
+            `• No podrá acceder al sistema\n` +
+            `• Sus registros históricos se mantendrán\n` +
+            `• Puede ser reactivado por un administrador\n\n` +
+            `¿Continuar con la desactivación?`
+        );
+
+        if (!confirmation) {
+            console.log('❌ Eliminación cancelada por el usuario');
             return;
         }
 
-        try {
-            console.log(`🗑️ Eliminando usuario: ${user.nombre}`);
-            
-            const response = await fetch(`/api/admin/usuarios/${userId}`, {
-                method: 'DELETE'
-            });
-
-            const result = await response.json();
-
-            if (result.success) {
-                this.showNotification(`Usuario ${user.nombre} eliminado correctamente`, 'success');
-                await this.loadUsers();
-                this.showUsersModal(); // Recargar el modal
-            } else {
-                throw new Error(result.message || 'Error al eliminar usuario');
+        this.showNotification('⏳ Desactivando usuario...', 'info');
+        
+        const response = await fetch(`/api/admin/usuarios/${userId}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                'Content-Type': 'application/json'
             }
-        } catch (error) {
-            console.error('❌ Error eliminando usuario:', error);
-            this.showNotification('Error al eliminar usuario: ' + error.message, 'error');
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            let message = `✅ Usuario "${user.nombre}" `;
+            message += result.tipo === 'soft_delete' ? 'desactivado' : 'eliminado';
+            message += ' correctamente';
+            
+            this.showNotification(message, 'success');
+            
+            // Mostrar detalles de la operación
+            if (result.data) {
+                console.log('📋 Detalles de la operación:', result.data);
+            }
+            
+            // Recargar la lista de usuarios
+            await this.loadUsers();
+            
+            // Recargar el modal
+            const modal = document.getElementById('adminUsersModal');
+            if (modal) {
+                this.showUsersModal();
+            }
+        } else {
+            throw new Error(result.message || 'Error al eliminar usuario');
         }
+    } catch (error) {
+        console.error('❌ Error eliminando usuario:', error);
+        
+        let errorMessage = 'Error al eliminar usuario: ' + error.message;
+        
+        if (error.message.includes('última cuenta de administrador')) {
+            errorMessage = 'No se puede eliminar la única cuenta de administrador activa.';
+        } else if (error.message.includes('No puedes eliminar tu propia cuenta')) {
+            errorMessage = 'No puedes desactivar tu propia cuenta.';
+        } else if (error.message.includes('registros relacionados')) {
+            errorMessage = 'El usuario tiene registros relacionados. Se aplicó desactivación exitosamente.';
+        }
+        
+        this.showNotification(errorMessage, 'error');
     }
+}
 
     /**
      * 🔍 Configurar búsqueda

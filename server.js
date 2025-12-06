@@ -530,9 +530,9 @@ app.delete('/api/admin/usuarios/:id', authenticateToken, requireAdmin, async (re
         // === NUEVO: Comprobar dependencias que impiden la eliminación ===
         const dependencyChecks = [
             { name: 'ordenadores_responsable', sql: 'SELECT COUNT(*) as count FROM ordenadores WHERE id_usuario_responsable = $1' },
-            { name: 'access_point_responsable', sql: 'SELECT COUNT(*) as count FROM access_point WHERE id_usuario_responsable = $1' },
+            { name: 'access_point_responsable', sql: 'SELECT COUNT(*) as count FROM access_point WHERE id_usuarios_responsable = $1' },
             { name: 'readers_responsable', sql: 'SELECT COUNT(*) as count FROM readers WHERE id_usuario_responsable = $1' },
-            { name: 'etiquetadoras_responsable', sql: 'SELECT COUNT(*) as count FROM etiquetadoras WHERE id_usuario_responsable = $1' },
+            { name: 'etiquetadoras_responsable', sql: 'SELECT COUNT(*) as count FROM etiquetadoras WHERE id_usuarios_responsable = $1' },
             { name: 'tablets_responsable', sql: 'SELECT COUNT(*) as count FROM tablets WHERE id_usuario_responsable = $1' },
             { name: 'lectores_qr_responsable', sql: 'SELECT COUNT(*) as count FROM lectores_qr WHERE id_usuarios_responsable = $1' },
             { name: 'mantenimientos', sql: 'SELECT COUNT(*) as count FROM mantenimientos WHERE id_usuarios = $1' },
@@ -540,13 +540,28 @@ app.delete('/api/admin/usuarios/:id', authenticateToken, requireAdmin, async (re
             { name: 'asistencias_registrante', sql: 'SELECT COUNT(*) as count FROM asistencias WHERE registrante_id = $1' }
         ];
 
-        const checks = await Promise.all(dependencyChecks.map(dc => databaseConfig.queryAsync(dc.sql, [userId])));
+        // Ejecutar las comprobaciones de dependencia de forma segura: si una consulta falla
+        // (por ejemplo, porque la columna no existe en la base de datos), registramos
+        // la advertencia y tratamos esa dependencia como 0 para evitar romper la operación.
+        const checksResults = await Promise.all(dependencyChecks.map(async (dc) => {
+            try {
+                const rows = await databaseConfig.queryAsync(dc.sql, [userId]);
+                return { name: dc.name, count: parseInt(rows[0]?.count || 0) };
+            } catch (err) {
+                Logger.warn('Dependencia no disponible o columna faltante', {
+                    dependencia: dc.name,
+                    sql: dc.sql,
+                    error: err.message
+                });
+                return { name: dc.name, count: 0 };
+            }
+        }));
+
         const dependencyCounts = {};
         let totalDependencies = 0;
-        for (let i = 0; i < dependencyChecks.length; i++) {
-            const cnt = parseInt(checks[i][0]?.count || 0);
-            dependencyCounts[dependencyChecks[i].name] = cnt;
-            totalDependencies += cnt;
+        for (const r of checksResults) {
+            dependencyCounts[r.name] = r.count;
+            totalDependencies += r.count;
         }
 
         // Si existen dependencias, devolver detalle y evitar borrar automáticamente

@@ -429,6 +429,39 @@ router.get("/usuarios", authenticateToken, requireAdmin, async (req, res) => {
     }
 });
 
+// 🔐 Endpoint para obtener lista simple (usada por la UI: /api/admin/usuarios/lista)
+router.get("/lista", authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const users = await queryAsync(
+            "SELECT id, cedula, nombre, correo, role, fecha_registro FROM usuarios ORDER BY id"
+        );
+        return res.json({ success: true, data: users });
+    } catch (error) {
+        console.error('❌ Error obteniendo lista simple de usuarios:', error.message);
+        return res.status(500).json({ success: false, message: 'Error al obtener usuarios.' });
+    }
+});
+
+// 🔐 Endpoint para obtener usuarios inactivos (si la columna `activo` existe)
+router.get("/inactivos", authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        // Intentar recuperar usuarios con `activo = false` si la columna está presente
+        try {
+            const rows = await queryAsync(
+                "SELECT id, cedula, nombre, correo, role, fecha_registro FROM usuarios WHERE activo = false ORDER BY nombre"
+            );
+            return res.json({ success: true, data: rows });
+        } catch (err) {
+            // Si falla porque la columna no existe, devolver lista vacía y loguear advertencia
+            console.warn('⚠️ columna `activo` no encontrada en `usuarios`; devolviendo lista vacía para inactivos', err.message);
+            return res.json({ success: true, data: [] });
+        }
+    } catch (error) {
+        console.error('❌ Error obteniendo usuarios inactivos:', error.message);
+        return res.status(500).json({ success: false, message: 'Error al obtener usuarios inactivos.' });
+    }
+});
+
 // 🔐 NUEVO: Endpoint para cambiar rol de usuario (solo admin)
 router.put("/usuarios/:id/role", authenticateToken, requireAdmin, async (req, res) => {
     try {
