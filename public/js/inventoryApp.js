@@ -552,6 +552,25 @@ const InventoryApp = {
         }
     },
 
+    // Compatibilidad: cargar estadísticas de dispositivos (llamada desde el dashboard)
+    loadDeviceStats: async function() {
+        try {
+            // Si no tenemos datos, los obtenemos
+            if (!this.currentData.devices || Object.keys(this.currentData.devices).length === 0) {
+                this.currentData.devices = await this.fetchDevicesData();
+            }
+
+            // Actualizar la tabla actual y los gráficos
+            this.updateDeviceTable(this.currentData.devices[this.currentTable] || []);
+            if (window.ChartsManager) {
+                window.ChartsManager.updateCharts(this.currentData.devices);
+            }
+        } catch (error) {
+            console.error('Error en loadDeviceStats:', error);
+            this.showError('devices', 'Error al cargar estadísticas de dispositivos: ' + error.message);
+        }
+    },
+
     fetchDevicesData: async function() {
         const deviceTypes = Object.keys(this.deviceTypes);
         const requests = deviceTypes.map(type => 

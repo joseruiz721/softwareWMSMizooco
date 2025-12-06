@@ -1270,8 +1270,14 @@
                         HorariosCalendario.inicializar();
                     }
                 } else if (sectionId === 'admin-users-section') {
-                    if (typeof AdminUsersManager !== 'undefined') {
-                        AdminUsersManager.loadUsers();
+                    // Usar la instancia global si está inicializada
+                    if (window.adminUsersManager && typeof window.adminUsersManager.loadUsers === 'function') {
+                        window.adminUsersManager.loadUsers();
+                    } else {
+                        // Intentar llamar al método estático si existe (compatibilidad)
+                        if (typeof AdminUsersManager !== 'undefined' && typeof AdminUsersManager.loadUsers === 'function') {
+                            AdminUsersManager.loadUsers();
+                        }
                     }
                 }
             }
