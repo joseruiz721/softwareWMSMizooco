@@ -73,7 +73,7 @@ const authenticateToken = async (req, res, next) => {
         }
 
         req.user = userQuery[0];
-        console.log('✅ Usuario autenticado (JWT):', req.user.nombre, '- Rol:', req.user.role, '- Ruta:', req.path);
+        console.log('✅ Usuario autenticado (JWT):', req.user?.nombre || 'Unknown', '- Rol:', req.user?.role || 'None', '- Ruta:', req.path);
         next();
     } catch (error) {
         console.error('❌ Error en autenticación JWT:', error.message);
@@ -135,7 +135,7 @@ const optionalToken = async (req, res, next) => {
 
         if (userQuery.length > 0) {
             req.user = userQuery[0];
-            console.log('✅ Usuario verificado (opcional):', req.user.nombre);
+            console.log('✅ Usuario verificado (opcional):', req.user?.nombre || 'Unknown');
         }
     } catch (error) {
         console.log('🟡 Token inválido en verificación opcional:', error.message);
@@ -159,10 +159,10 @@ function requireAdmin(req, res, next) {
     if (!requiresAdmin) {
         // Para rutas que no son de gestión de usuarios, cualquier usuario autenticado puede acceder
         if (req.session && req.session.user) {
-            console.log('✅ Acceso permitido para usuario regular:', req.session.user.nombre);
+            console.log('✅ Acceso permitido para usuario regular:', req.session.user?.nombre || 'Unknown');
             return next();
         } else if (req.user) {
-            console.log('✅ Acceso permitido para usuario regular (JWT):', req.user.nombre);
+            console.log('✅ Acceso permitido para usuario regular (JWT):', req.user?.nombre || 'Unknown');
             return next();
         } else {
             return res.status(401).json({ 
@@ -174,9 +174,9 @@ function requireAdmin(req, res, next) {
     }
     
     // Para rutas de gestión de usuarios, requerir admin
-    if (req.session && req.session.user) {
+        if (req.session && req.session.user) {
         if (req.session.user.role !== 'admin') {
-            console.log('❌ Intento de acceso no autorizado - Sesión:', req.session.user.nombre, 'Rol:', req.session.user.role);
+            console.log('❌ Intento de acceso no autorizado - Sesión:', req.session.user?.nombre || 'Unknown', 'Rol:', req.session.user?.role || 'None');
             
             if (req.path.startsWith('/api/')) {
                 return res.status(403).json({ 
@@ -189,19 +189,19 @@ function requireAdmin(req, res, next) {
             req.session.error = 'No tienes permisos de administrador para acceder a esta página';
             return res.redirect('/dashboard');
         }
-        console.log('✅ Acceso admin autorizado - Sesión:', req.session.user.nombre);
+        console.log('✅ Acceso admin autorizado - Sesión:', req.session.user?.nombre || 'Unknown');
         next();
     }
     else if (req.user) {
         if (req.user.role !== 'admin') {
-            console.log('❌ Intento de acceso no autorizado - JWT:', req.user.nombre, 'Rol:', req.user.role);
+            console.log('❌ Intento de acceso no autorizado - JWT:', req.user?.nombre || 'Unknown', 'Rol:', req.user?.role || 'None');
             return res.status(403).json({ 
                 success: false,
                 message: 'Se requieren privilegios de administrador para esta acción',
                 error: 'ADMIN_REQUIRED'
             });
         }
-        console.log('✅ Acceso admin autorizado - JWT:', req.user.nombre);
+        console.log('✅ Acceso admin autorizado - JWT:', req.user?.nombre || 'Unknown');
         next();
     }
     else {

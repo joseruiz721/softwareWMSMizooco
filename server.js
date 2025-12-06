@@ -381,7 +381,7 @@ app.get('/api/usuarios/perfil', authenticateToken, async (req, res) => {
     } catch (error) {
         Logger.error('Error obteniendo perfil de usuario', {
             error: error.message,
-            usuario: req.user.nombre
+            usuario: req.user?.nombre || 'Unknown'
         });
         res.status(500).json({
             success: false,
@@ -398,7 +398,7 @@ app.get('/api/usuarios/perfil', authenticateToken, async (req, res) => {
 app.get('/api/admin/usuarios/lista', authenticateToken, requireAdmin, async (req, res) => {
     try {
         Logger.info('Solicitando lista completa de usuarios', {
-            usuario: req.user.nombre
+            usuario: req.user?.nombre || 'Unknown'
         });
 
         const users = await databaseConfig.queryAsync(
@@ -408,7 +408,7 @@ app.get('/api/admin/usuarios/lista', authenticateToken, requireAdmin, async (req
         );
 
         Logger.info(`Lista de usuarios enviada: ${users.length} usuarios`, {
-            usuario: req.user.nombre
+            usuario: req.user?.nombre || 'Unknown'
         });
 
         res.json({
@@ -419,7 +419,7 @@ app.get('/api/admin/usuarios/lista', authenticateToken, requireAdmin, async (req
     } catch (error) {
         Logger.error('Error obteniendo lista de usuarios', {
             error: error.message,
-            usuario: req.user.nombre
+            usuario: req.user?.nombre || 'Unknown'
         });
         res.status(500).json({
             success: false,
@@ -477,7 +477,7 @@ app.put('/api/admin/usuarios/:id/rol', authenticateToken, requireAdmin, async (r
         }
 
         Logger.info('Rol de usuario actualizado', {
-            administrador: req.user.nombre,
+            administrador: req.user?.nombre || 'Unknown',
             usuario: result[0].nombre,
             nuevoRol: role
         });
@@ -491,7 +491,7 @@ app.put('/api/admin/usuarios/:id/rol', authenticateToken, requireAdmin, async (r
     } catch (error) {
         Logger.error('Error actualizando rol de usuario', {
             error: error.message,
-            administrador: req.user.nombre,
+            administrador: req.user?.nombre || 'Unknown',
             usuarioId: req.params.id
         });
         res.status(500).json({
@@ -549,7 +549,7 @@ app.delete('/api/admin/usuarios/:id', authenticateToken, requireAdmin, async (re
         );
 
         Logger.info('Usuario eliminado del sistema', {
-            administrador: req.user.nombre,
+            administrador: req.user?.nombre || 'Unknown',
             usuarioEliminado: user[0].nombre
         });
 
@@ -561,7 +561,7 @@ app.delete('/api/admin/usuarios/:id', authenticateToken, requireAdmin, async (re
     } catch (error) {
         Logger.error('Error eliminando usuario', {
             error: error.message,
-            administrador: req.user.nombre,
+            administrador: req.user?.nombre || 'Unknown',
             usuarioId: req.params.id
         });
         res.status(500).json({
@@ -616,7 +616,7 @@ app.delete('/api/usuarios/perfil', authenticateToken, async (req, res) => {
         );
         
         Logger.info('Cuenta eliminada por administrador', {
-            usuario: req.user.nombre,
+            usuario: req.user?.nombre || 'Unknown',
             id: userId
         });
         
@@ -628,7 +628,7 @@ app.delete('/api/usuarios/perfil', authenticateToken, async (req, res) => {
     } catch (error) {
         Logger.error('Error eliminando cuenta', {
             error: error.message,
-            usuario: req.user.nombre
+            usuario: req.user?.nombre || 'Unknown'
         });
         res.status(500).json({
             success: false,
@@ -646,7 +646,7 @@ app.get('/api/buscar-avanzado', authenticateToken, async (req, res) => {
         const { q: query } = req.query;
         
         Logger.info('Búsqueda avanzada solicitada', { 
-            usuario: req.user.nombre,
+            usuario: req.user?.nombre || 'Unknown',
             termino: query 
         });
         
@@ -783,7 +783,7 @@ app.get('/api/buscar-avanzado', authenticateToken, async (req, res) => {
 
         Logger.info('Búsqueda completada', { 
             totalResultados: searchResults.length,
-            usuario: req.user.nombre
+            usuario: req.user?.nombre || 'Unknown'
         });
         
         // Limitar resultados para mejor performance
@@ -794,7 +794,7 @@ app.get('/api/buscar-avanzado', authenticateToken, async (req, res) => {
     } catch (error) {
         Logger.error('Error en búsqueda avanzada', {
             error: error.message,
-            usuario: req.user.nombre
+            usuario: req.user?.nombre || 'Unknown'
         });
         res.status(500).json({ 
             success: false, 

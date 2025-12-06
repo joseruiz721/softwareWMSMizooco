@@ -515,7 +515,7 @@ router.delete("/usuarios/:id", authenticateToken, requireAdmin, async (req, res)
 
         await queryAsync("DELETE FROM usuarios WHERE id = $1", [id]);
 
-        console.log(`🗑️ Usuario ${id} eliminado por administrador ${req.user.nombre}`);
+        console.log(`🗑️ Usuario ${id} eliminado por administrador ${req.user?.nombre || 'Unknown'}`);
 
         return res.json({
             success: true,
