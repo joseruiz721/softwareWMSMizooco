@@ -527,6 +527,39 @@ app.delete('/api/admin/usuarios/:id', authenticateToken, requireAdmin, async (re
             });
         }
 
+        // === NUEVO: Comprobar dependencias que impiden la eliminación ===
+        const dependencyChecks = [
+            { name: 'ordenadores_responsable', sql: 'SELECT COUNT(*) as count FROM ordenadores WHERE id_usuario_responsable = $1' },
+            { name: 'access_point_responsable', sql: 'SELECT COUNT(*) as count FROM access_point WHERE id_usuario_responsable = $1' },
+            { name: 'readers_responsable', sql: 'SELECT COUNT(*) as count FROM readers WHERE id_usuario_responsable = $1' },
+            { name: 'etiquetadoras_responsable', sql: 'SELECT COUNT(*) as count FROM etiquetadoras WHERE id_usuario_responsable = $1' },
+            { name: 'tablets_responsable', sql: 'SELECT COUNT(*) as count FROM tablets WHERE id_usuario_responsable = $1' },
+            { name: 'lectores_qr_responsable', sql: 'SELECT COUNT(*) as count FROM lectores_qr WHERE id_usuarios_responsable = $1' },
+            { name: 'mantenimientos', sql: 'SELECT COUNT(*) as count FROM mantenimientos WHERE id_usuarios = $1' },
+            { name: 'asistencias_usuario', sql: 'SELECT COUNT(*) as count FROM asistencias WHERE usuario_id = $1' },
+            { name: 'asistencias_registrante', sql: 'SELECT COUNT(*) as count FROM asistencias WHERE registrante_id = $1' }
+        ];
+
+        const checks = await Promise.all(dependencyChecks.map(dc => databaseConfig.queryAsync(dc.sql, [userId])));
+        const dependencyCounts = {};
+        let totalDependencies = 0;
+        for (let i = 0; i < dependencyChecks.length; i++) {
+            const cnt = parseInt(checks[i][0]?.count || 0);
+            dependencyCounts[dependencyChecks[i].name] = cnt;
+            totalDependencies += cnt;
+        }
+
+        // Si existen dependencias, devolver detalle y evitar borrar automáticamente
+        const cascade = req.query.cascade === 'true' || req.query.force === 'true';
+        if (totalDependencies > 0 && !cascade) {
+            return res.status(400).json({
+                success: false,
+                message: 'El usuario tiene referencias en otras tablas que impiden su eliminación.',
+                dependencies: dependencyCounts,
+                hint: 'Reasigna o elimina las referencias antes de borrar el usuario. Para forzar borrado automático (RIESGOSO), llame con ?cascade=true pero revise consecuencias.'
+            });
+        }
+
         // Verificar que no sea el último administrador
         if (user[0].role === 'admin') {
             const adminCount = await databaseConfig.queryAsync(
