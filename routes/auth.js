@@ -106,6 +106,15 @@ router.post("/login", async (req, res) => {
         const usuario = rows[0];
         console.log('✅ Usuario encontrado:', usuario.nombre, '- Rol:', usuario.role);
         
+        // 🔥 VERIFICAR SI EL USUARIO ESTÁ BLOQUEADO
+        if (usuario.estado === 'bloqueado') {
+            console.log('🚫 Usuario bloqueado intentando acceder:', usuario.nombre);
+            return res.status(403).json({ 
+                success: false, 
+                message: "Tu cuenta ha sido bloqueada. Contacta al administrador." 
+            });
+        }
+        
         if (!usuario.contrasena) {
             console.error('❌ Usuario sin contraseña hash:', usuario.correo);
             return res.status(500).json({ 
@@ -131,7 +140,8 @@ router.post("/login", async (req, res) => {
             nombre: usuario.nombre,
             correo: usuario.correo,
             role: usuario.role,
-            fecha_registro: usuario.fecha_registro
+            fecha_registro: usuario.fecha_registro,
+            estado: usuario.estado || 'activo' // 🔥 Incluir estado en sesión
         };
         
         // Guardar la sesión tanto con el objeto user como con userId para compatibilidad
@@ -156,7 +166,7 @@ router.post("/login", async (req, res) => {
             { expiresIn: tokenExpiry }
         );
         
-        console.log('✅ Credenciales correctas para:', usuario.nombre, '- Rol:', usuario.role);
+        console.log('✅ Credenciales correctas para:', usuario.nombre, '- Rol:', usuario.role, '- Estado:', usuario.estado || 'activo');
         
         // Guardar sesión
         req.session.save((err) => {
@@ -266,12 +276,12 @@ router.post("/registro", async (req, res) => {
         const hashedPassword = await bcrypt.hash(pass, 10);
         
         const result = await databaseConfig.queryAsync(
-            "INSERT INTO usuarios (cedula, nombre, correo, contrasena, role, fecha_registro) VALUES ($1, $2, $3, $4, $5, NOW()) RETURNING id, cedula, nombre, correo, role, fecha_registro",
+            "INSERT INTO usuarios (cedula, nombre, correo, contrasena, role, fecha_registro, estado) VALUES ($1, $2, $3, $4, $5, NOW(), 'activo') RETURNING id, cedula, nombre, correo, role, fecha_registro, estado",
             [ced, nom, correo, hashedPassword, finalRole]
         );
 
         const newUser = result[0];
-        console.log('✅ Usuario registrado exitosamente, ID:', newUser.id, '- Rol:', newUser.role);
+        console.log('✅ Usuario registrado exitosamente, ID:', newUser.id, '- Rol:', newUser.role, '- Estado:', newUser.estado);
 
         return res.json({ 
             success: true, 
@@ -282,7 +292,8 @@ router.post("/registro", async (req, res) => {
                 nombre: newUser.nombre,
                 correo: newUser.correo,
                 role: newUser.role,
-                fecha_registro: newUser.fecha_registro
+                fecha_registro: newUser.fecha_registro,
+                estado: newUser.estado
             },
             redirect: "/"
         });
@@ -348,12 +359,12 @@ router.post("/registro-admin", async (req, res) => {
         const hashedPassword = await bcrypt.hash(pass, 10);
         
         const result = await databaseConfig.queryAsync(
-            "INSERT INTO usuarios (cedula, nombre, correo, contrasena, role, fecha_registro) VALUES ($1, $2, $3, $4, $5, NOW()) RETURNING id, cedula, nombre, correo, role, fecha_registro",
+            "INSERT INTO usuarios (cedula, nombre, correo, contrasena, role, fecha_registro, estado) VALUES ($1, $2, $3, $4, $5, NOW(), 'activo') RETURNING id, cedula, nombre, correo, role, fecha_registro, estado",
             [ced, nom, correo, hashedPassword, role]
         );
 
         const newAdmin = result[0];
-        console.log('✅ Administrador registrado exitosamente:', newAdmin.nombre, '- Rol:', newAdmin.role);
+        console.log('✅ Administrador registrado exitosamente:', newAdmin.nombre, '- Rol:', newAdmin.role, '- Estado:', newAdmin.estado);
 
         res.json({
             success: true,
@@ -364,7 +375,8 @@ router.post("/registro-admin", async (req, res) => {
                 nombre: newAdmin.nombre,
                 correo: newAdmin.correo,
                 role: newAdmin.role,
-                fecha_registro: newAdmin.fecha_registro
+                fecha_registro: newAdmin.fecha_registro,
+                estado: newAdmin.estado
             }
         });
 
@@ -395,7 +407,7 @@ router.post('/solicitar-reset', async (req, res) => {
         }
 
         const rows = await databaseConfig.queryAsync(
-            "SELECT id, nombre, correo FROM usuarios WHERE correo = $1", 
+            "SELECT id, nombre, correo, estado FROM usuarios WHERE correo = $1", 
             [correo]
         );
         
@@ -408,6 +420,15 @@ router.post('/solicitar-reset', async (req, res) => {
         }
         
         const usuario = rows[0];
+        
+        // 🔥 VERIFICAR SI EL USUARIO ESTÁ BLOQUEADO
+        if (usuario.estado === 'bloqueado') {
+            console.log('🚫 Usuario bloqueado intentando recuperar contraseña:', usuario.nombre);
+            return res.json({ 
+                success: false, 
+                message: "Tu cuenta está bloqueada. Contacta al administrador para recuperar el acceso." 
+            });
+        }
         
         const token = crypto.randomBytes(32).toString('hex');
         const expires = new Date(Date.now() + 3600000);
@@ -485,7 +506,7 @@ router.post('/reestablecer-pass', async (req, res) => {
 
     try {
         const rows = await databaseConfig.queryAsync(
-            "SELECT id, nombre, correo FROM usuarios WHERE reset_token = $1 AND reset_token_expires > NOW()",
+            "SELECT id, nombre, correo, estado FROM usuarios WHERE reset_token = $1 AND reset_token_expires > NOW()",
             [token]
         );
 
@@ -498,6 +519,15 @@ router.post('/reestablecer-pass', async (req, res) => {
         }
 
         const usuario = rows[0];
+        
+        // 🔥 VERIFICAR SI EL USUARIO ESTÁ BLOQUEADO
+        if (usuario.estado === 'bloqueado') {
+            console.log('🚫 Usuario bloqueado intentando restablecer contraseña:', usuario.nombre);
+            return res.status(403).json({ 
+                success: false, 
+                message: "Tu cuenta está bloqueada. No puedes restablecer la contraseña." 
+            });
+        }
         
         const hashedPassword = await bcrypt.hash(password, 12);
 
@@ -572,7 +602,7 @@ router.get("/auth-status", checkAuthStatus, async (req, res) => {
 router.get("/usuarios", authenticateToken, requireAdmin, async (req, res) => {
     try {
         const users = await databaseConfig.queryAsync(
-            "SELECT id, cedula, nombre, correo, role, fecha_registro FROM usuarios ORDER BY fecha_registro DESC"
+            "SELECT id, cedula, nombre, correo, role, fecha_registro, estado FROM usuarios ORDER BY fecha_registro DESC"
         );
         
         return res.json({
@@ -643,20 +673,28 @@ router.put("/usuarios/:id/role", authenticateToken, requireAdmin, async (req, re
     }
 });
 
-// Endpoint para eliminar usuario (solo admin)
-router.delete("/usuarios/:id", authenticateToken, requireAdmin, async (req, res) => {
+// Endpoint para cambiar estado de usuario (bloquear/activar)
+router.put("/usuarios/:id/estado", authenticateToken, requireAdmin, async (req, res) => {
     try {
         const { id } = req.params;
+        const { estado } = req.body;
+
+        if (!estado || !['activo', 'bloqueado'].includes(estado)) {
+            return res.status(400).json({
+                success: false,
+                message: "Estado inválido. Debe ser 'activo' o 'bloqueado'."
+            });
+        }
 
         if (parseInt(id) === req.user.id) {
             return res.status(403).json({
                 success: false,
-                message: "No puedes eliminar tu propia cuenta."
+                message: "No puedes cambiar tu propio estado."
             });
         }
 
         const userExists = await databaseConfig.queryAsync(
-            "SELECT id, nombre, role FROM usuarios WHERE id = $1", 
+            "SELECT id, nombre, correo FROM usuarios WHERE id = $1", 
             [id]
         );
         
@@ -667,29 +705,145 @@ router.delete("/usuarios/:id", authenticateToken, requireAdmin, async (req, res)
             });
         }
 
+        await databaseConfig.queryAsync(
+            "UPDATE usuarios SET estado = $1 WHERE id = $2", 
+            [estado, id]
+        );
+
+        const usuario = userExists[0];
+        console.log(`🔐 Estado actualizado: Usuario ${usuario.nombre} (${id}) ahora está ${estado}`);
+
+        // Si se bloquea un usuario, destruir cualquier sesión activa
+        if (estado === 'bloqueado') {
+            // Aquí podrías agregar lógica para invalidar tokens JWT activos si los tiene
+            console.log(`🚫 Usuario ${usuario.nombre} bloqueado - Se recomienda invalidar tokens activos`);
+        }
+
+        return res.json({
+            success: true,
+            message: `Estado actualizado a ${estado} correctamente.`,
+            user: {
+                id: usuario.id,
+                nombre: usuario.nombre,
+                correo: usuario.correo,
+                estado: estado
+            }
+        });
+
+    } catch (error) {
+        console.error("❌ Error actualizando estado:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Error al actualizar estado.",
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+    }
+});
+
+// Endpoint para eliminar usuario (solo admin)
+router.delete("/usuarios/:id", authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        console.log(`🗑️ Intentando eliminar usuario ID: ${id} por administrador: ${req.user?.nombre || 'Unknown'}`);
+
+        // Verificar que el ID sea válido
+        if (!id || isNaN(parseInt(id)) || parseInt(id) <= 0) {
+            return res.status(400).json({
+                success: false,
+                message: "ID de usuario inválido."
+            });
+        }
+
+        const userId = parseInt(id);
+
+        if (userId === req.user.id) {
+            return res.status(403).json({
+                success: false,
+                message: "No puedes eliminar tu propia cuenta."
+            });
+        }
+
+        // Verificar si el usuario existe
+        const userExists = await databaseConfig.queryAsync(
+            "SELECT id, nombre, role, estado FROM usuarios WHERE id = $1", 
+            [userId]
+        );
+        
+        if (userExists.length === 0) {
+            console.log(`❌ Usuario con ID ${userId} no encontrado`);
+            return res.status(404).json({
+                success: false,
+                message: "Usuario no encontrado."
+            });
+        }
+
         const usuario = userExists[0];
 
+        // Si el usuario ya está marcado como eliminado
+        if (usuario.estado === 'eliminado') {
+            return res.status(400).json({
+                success: false,
+                message: "Este usuario ya ha sido eliminado anteriormente."
+            });
+        }
+
+        // Si es administrador, verificar que no sea el único admin activo
         if (usuario.role === 'admin') {
             const adminCount = await databaseConfig.queryAsync(
-                "SELECT COUNT(*) as count FROM usuarios WHERE role = 'admin'",
-                []
+                "SELECT COUNT(*) as count FROM usuarios WHERE role = 'admin' AND estado != 'eliminado' AND id != $1",
+                [userId]
             );
             
-            if (parseInt(adminCount[0].count) <= 1) {
+            if (parseInt(adminCount[0].count) < 1) {
                 return res.status(403).json({
                     success: false,
-                    message: "No puedes eliminar la única cuenta de administrador del sistema."
+                    message: "No puedes eliminar la única cuenta de administrador activa del sistema."
                 });
             }
         }
 
-        await databaseConfig.queryAsync("DELETE FROM usuarios WHERE id = $1", [id]);
+        // Verificar si el usuario tiene datos relacionados (opcional, depende de tus requerimientos)
+        try {
+            // Puedes agregar verificaciones aquí para tablas relacionadas
+            // Ejemplo: verificar si tiene registros en otras tablas
+            
+            // Si necesitas prevenir eliminación si tiene datos relacionados:
+            /*
+            const tieneAsistencias = await databaseConfig.queryAsync(
+                "SELECT COUNT(*) as count FROM asistencias WHERE usuario_id = $1",
+                [userId]
+            );
+            
+            if (parseInt(tieneAsistencias[0].count) > 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: "No se puede eliminar el usuario porque tiene registros de asistencias."
+                });
+            }
+            */
+            
+        } catch (relationError) {
+            console.warn('⚠️ Error verificando relaciones del usuario:', relationError.message);
+            // Continuar con la eliminación incluso si hay error en las verificaciones
+        }
 
-        console.log(`🗑️ Usuario ${usuario.nombre} (${id}) eliminado por administrador ${req.user?.nombre || 'Unknown'}`);
+        // Usar eliminación lógica (marcar como eliminado) en lugar de DELETE físico
+        await databaseConfig.queryAsync(
+            "UPDATE usuarios SET estado = 'eliminado', correo = CONCAT(correo, '_eliminado_', EXTRACT(EPOCH FROM NOW())) WHERE id = $1", 
+            [userId]
+        );
+
+        console.log(`✅ Usuario ${usuario.nombre} (ID: ${userId}) marcado como eliminado por administrador ${req.user?.nombre || 'Unknown'}`);
 
         return res.json({
             success: true,
-            message: "Usuario eliminado correctamente."
+            message: "Usuario eliminado correctamente.",
+            data: {
+                id: userId,
+                nombre: usuario.nombre,
+                estado: 'eliminado'
+            }
         });
 
     } catch (error) {
@@ -710,9 +864,12 @@ router.get("/estadisticas", authenticateToken, requireAdmin, async (req, res) =>
                 COUNT(*) as total_usuarios,
                 COUNT(CASE WHEN role = 'admin' THEN 1 END) as total_admins,
                 COUNT(CASE WHEN role = 'user' THEN 1 END) as total_users,
+                COUNT(CASE WHEN estado = 'activo' THEN 1 END) as usuarios_activos,
+                COUNT(CASE WHEN estado = 'bloqueado' THEN 1 END) as usuarios_bloqueados,
                 MIN(fecha_registro) as primer_registro,
                 MAX(fecha_registro) as ultimo_registro
             FROM usuarios
+            WHERE estado != 'eliminado'
         `);
         
         return res.json({

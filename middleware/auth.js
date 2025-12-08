@@ -1,4 +1,4 @@
-// middleware/auth.js - PERMISOS CORREGIDOS
+// middleware/auth.js - PERMISOS CORREGIDOS CON VERIFICACIÓN DE ESTADO BLOQUEADO
 const jwt = require('jsonwebtoken');
 const databaseConfig = require('../config/database');
 const Logger = require('../config/logger');
@@ -8,6 +8,28 @@ function requireAuth(req, res, next) {
     Logger.debug('🔐 Verificando autenticación para: ' + req.path);
     
     if (req.session && req.session.user) {
+        // 🔥 VERIFICAR SI EL USUARIO ESTÁ BLOQUEADO
+        if (req.session.user.estado === 'bloqueado') {
+            Logger.warn(`🚫 Usuario bloqueado intentando acceder: ${req.session.user.nombre}`);
+            
+            // Destruir la sesión del usuario bloqueado
+            req.session.destroy((err) => {
+                if (err) {
+                    Logger.error('❌ Error destruyendo sesión de usuario bloqueado:', err);
+                }
+            });
+            
+            if (req.path.startsWith('/api/')) {
+                return res.status(403).json({
+                    success: false,
+                    message: "Tu cuenta ha sido bloqueada. Contacta al administrador.",
+                    error: "ACCOUNT_BLOCKED"
+                });
+            }
+            
+            return res.redirect('/?error=account_blocked');
+        }
+        
         Logger.info('✅ Usuario autenticado: ' + req.session.user.nombre);
         next();
     } else {
@@ -28,8 +50,16 @@ function requireAuth(req, res, next) {
 
 function optionalAuth(req, res, next) {
     if (req.session && req.session.user) {
-        Logger.debug('✅ Usuario autenticado (opcional): ' + req.session.user.nombre);
-        req.isAuthenticated = true;
+        // 🔥 VERIFICAR SI EL USUARIO ESTÁ BLOQUEADO
+        if (req.session.user.estado === 'bloqueado') {
+            Logger.warn(`🚫 Usuario bloqueado detectado en optionalAuth: ${req.session.user.nombre}`);
+            req.session.destroy(() => {
+                req.isAuthenticated = false;
+            });
+        } else {
+            Logger.debug('✅ Usuario autenticado (opcional): ' + req.session.user.nombre);
+            req.isAuthenticated = true;
+        }
     } else {
         req.isAuthenticated = false;
     }
@@ -60,7 +90,7 @@ const authenticateToken = async (req, res, next) => {
         const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret');
         
         const userQuery = await databaseConfig.queryAsync(
-            'SELECT id, cedula, nombre, correo, role FROM usuarios WHERE id = $1',
+            'SELECT id, cedula, nombre, correo, role, estado FROM usuarios WHERE id = $1',
             [decoded.userId]
         );
 
@@ -73,8 +103,20 @@ const authenticateToken = async (req, res, next) => {
             });
         }
 
-        req.user = userQuery[0];
-        Logger.info('✅ Usuario autenticado (JWT): ' + (req.user?.nombre || 'Unknown') + ' - Rol: ' + (req.user?.role || 'None') + ' - Ruta: ' + req.path);
+        const usuario = userQuery[0];
+        
+        // 🔥 VERIFICAR SI EL USUARIO ESTÁ BLOQUEADO
+        if (usuario.estado === 'bloqueado') {
+            Logger.warn(`🚫 Usuario bloqueado intentando acceder con JWT: ${usuario.nombre}`);
+            return res.status(403).json({ 
+                success: false,
+                message: 'Tu cuenta ha sido bloqueada. Contacta al administrador.',
+                error: 'ACCOUNT_BLOCKED'
+            });
+        }
+
+        req.user = usuario;
+        Logger.info('✅ Usuario autenticado (JWT): ' + (req.user?.nombre || 'Unknown') + ' - Rol: ' + (req.user?.role || 'None') + ' - Estado: ' + (req.user?.estado || 'activo') + ' - Ruta: ' + req.path);
         next();
     } catch (error) {
         Logger.error('❌ Error en autenticación JWT:', { message: error.message });
@@ -130,13 +172,21 @@ const optionalToken = async (req, res, next) => {
         const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret');
         
         const userQuery = await databaseConfig.queryAsync(
-            'SELECT id, cedula, nombre, correo, role FROM usuarios WHERE id = $1',
+            'SELECT id, cedula, nombre, correo, role, estado FROM usuarios WHERE id = $1',
             [decoded.userId]
         );
 
         if (userQuery.length > 0) {
-            req.user = userQuery[0];
-            Logger.debug('✅ Usuario verificado (opcional): ' + (req.user?.nombre || 'Unknown'));
+            const usuario = userQuery[0];
+            
+            // 🔥 VERIFICAR SI EL USUARIO ESTÁ BLOQUEADO
+            if (usuario.estado === 'bloqueado') {
+                Logger.warn(`🚫 Usuario bloqueado detectado en optionalToken: ${usuario.nombre}`);
+                req.user = null;
+            } else {
+                req.user = usuario;
+                Logger.debug('✅ Usuario verificado (opcional): ' + (req.user?.nombre || 'Unknown') + ' - Estado: ' + req.user?.estado);
+            }
         }
     } catch (error) {
         Logger.debug('🟡 Token inválido en verificación opcional: ' + error.message);
@@ -160,9 +210,29 @@ function requireAdmin(req, res, next) {
     if (!requiresAdmin) {
         // Para rutas que no son de gestión de usuarios, cualquier usuario autenticado puede acceder
         if (req.session && req.session.user) {
+            // 🔥 VERIFICAR SI EL USUARIO ESTÁ BLOQUEADO
+            if (req.session.user.estado === 'bloqueado') {
+                Logger.warn(`🚫 Usuario bloqueado intentando acceder: ${req.session.user.nombre}`);
+                req.session.destroy(() => {
+                    return res.status(403).json({
+                        success: false,
+                        message: 'Tu cuenta ha sido bloqueada',
+                        error: 'ACCOUNT_BLOCKED'
+                    });
+                });
+            }
             Logger.debug('✅ Acceso permitido para usuario regular: ' + (req.session.user?.nombre || 'Unknown'));
             return next();
         } else if (req.user) {
+            // 🔥 VERIFICAR SI EL USUARIO ESTÁ BLOQUEADO
+            if (req.user.estado === 'bloqueado') {
+                Logger.warn(`🚫 Usuario bloqueado intentando acceder (JWT): ${req.user.nombre}`);
+                return res.status(403).json({
+                    success: false,
+                    message: 'Tu cuenta ha sido bloqueada',
+                    error: 'ACCOUNT_BLOCKED'
+                });
+            }
             Logger.debug('✅ Acceso permitido para usuario regular (JWT): ' + (req.user?.nombre || 'Unknown'));
             return next();
         } else {
@@ -175,7 +245,19 @@ function requireAdmin(req, res, next) {
     }
     
     // Para rutas de gestión de usuarios, requerir admin
-        if (req.session && req.session.user) {
+    if (req.session && req.session.user) {
+        // 🔥 VERIFICAR SI EL USUARIO ESTÁ BLOQUEADO
+        if (req.session.user.estado === 'bloqueado') {
+            Logger.warn(`🚫 Administrador bloqueado intentando acceder: ${req.session.user.nombre}`);
+            req.session.destroy(() => {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Tu cuenta de administrador ha sido bloqueada',
+                    error: 'ADMIN_ACCOUNT_BLOCKED'
+                });
+            });
+        }
+        
         if (req.session.user.role !== 'admin') {
             Logger.warn('❌ Intento de acceso no autorizado - Sesión: ' + (req.session.user?.nombre || 'Unknown') + ' Rol: ' + (req.session.user?.role || 'None'));
             
@@ -194,6 +276,16 @@ function requireAdmin(req, res, next) {
         next();
     }
     else if (req.user) {
+        // 🔥 VERIFICAR SI EL USUARIO ESTÁ BLOQUEADO
+        if (req.user.estado === 'bloqueado') {
+            Logger.warn(`🚫 Administrador bloqueado intentando acceder (JWT): ${req.user.nombre}`);
+            return res.status(403).json({
+                success: false,
+                message: 'Tu cuenta de administrador ha sido bloqueada',
+                error: 'ADMIN_ACCOUNT_BLOCKED'
+            });
+        }
+        
         if (req.user.role !== 'admin') {
             Logger.warn('❌ Intento de acceso no autorizado - JWT: ' + (req.user?.nombre || 'Unknown') + ' Rol: ' + (req.user?.role || 'None'));
             return res.status(403).json({ 
@@ -221,6 +313,27 @@ function requireRole(roles) {
         const userRole = (req.session && req.session.user) ? req.session.user.role : 
                         (req.user) ? req.user.role : null;
         
+        // 🔥 VERIFICAR SI EL USUARIO ESTÁ BLOQUEADO
+        if (req.session && req.session.user && req.session.user.estado === 'bloqueado') {
+            Logger.warn(`🚫 Usuario bloqueado intentando acceder con requireRole: ${req.session.user.nombre}`);
+            req.session.destroy(() => {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Tu cuenta ha sido bloqueada',
+                    error: 'ACCOUNT_BLOCKED'
+                });
+            });
+        }
+        
+        if (req.user && req.user.estado === 'bloqueado') {
+            Logger.warn(`🚫 Usuario bloqueado intentando acceder con requireRole (JWT): ${req.user.nombre}`);
+            return res.status(403).json({
+                success: false,
+                message: 'Tu cuenta ha sido bloqueada',
+                error: 'ACCOUNT_BLOCKED'
+            });
+        }
+        
         if (!userRole || !roles.includes(userRole)) {
             Logger.warn('❌ Intento de acceso con rol insuficiente: ' + userRole + ' Requiere: ' + roles);
             
@@ -246,6 +359,27 @@ function checkPermission(operation) {
     return (req, res, next) => {
         const userRole = (req.session && req.session.user) ? req.session.user.role : 
                         (req.user) ? req.user.role : null;
+        
+        // 🔥 VERIFICAR SI EL USUARIO ESTÁ BLOQUEADO
+        if (req.session && req.session.user && req.session.user.estado === 'bloqueado') {
+            Logger.warn(`🚫 Usuario bloqueado intentando operación: ${operation} - ${req.session.user.nombre}`);
+            req.session.destroy(() => {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Tu cuenta ha sido bloqueada',
+                    error: 'ACCOUNT_BLOCKED'
+                });
+            });
+        }
+        
+        if (req.user && req.user.estado === 'bloqueado') {
+            Logger.warn(`🚫 Usuario bloqueado intentando operación (JWT): ${operation} - ${req.user.nombre}`);
+            return res.status(403).json({
+                success: false,
+                message: 'Tu cuenta ha sido bloqueada',
+                error: 'ACCOUNT_BLOCKED'
+            });
+        }
         
         // 🔥 MODIFICADO: Solo operaciones que realmente requieren admin
         const adminOnlyOperations = [
@@ -292,16 +426,30 @@ async function enrichSessionWithUserData(req, res, next) {
             Logger.info('🔄 Enriqueciendo sesión con datos de BD para usuario: ' + req.session.user.id);
             
             const userQuery = await databaseConfig.queryAsync(
-                'SELECT id, cedula, nombre, correo, role FROM usuarios WHERE id = $1',
+                'SELECT id, cedula, nombre, correo, role, estado FROM usuarios WHERE id = $1',
                 [req.session.user.id]
             );
             
             if (userQuery.length > 0) {
-                req.session.user.role = userQuery[0].role;
-                req.session.user.correo = userQuery[0].correo;
-                req.session.user.nombre = userQuery[0].nombre;
-                req.session.user.cedula = userQuery[0].cedula;
-                Logger.info('✅ Sesión enriquecida con datos de BD - Rol: ' + req.session.user.role);
+                const usuario = userQuery[0];
+                
+                // 🔥 VERIFICAR SI EL USUARIO ESTÁ BLOQUEADO
+                if (usuario.estado === 'bloqueado') {
+                    Logger.warn(`🚫 Sesión de usuario bloqueado detectada: ${usuario.nombre}`);
+                    req.session.destroy((err) => {
+                        if (err) {
+                            Logger.error('❌ Error destruyendo sesión de usuario bloqueado:', err);
+                        }
+                    });
+                    return next();
+                }
+                
+                req.session.user.role = usuario.role;
+                req.session.user.correo = usuario.correo;
+                req.session.user.nombre = usuario.nombre;
+                req.session.user.cedula = usuario.cedula;
+                req.session.user.estado = usuario.estado || 'activo';
+                Logger.info('✅ Sesión enriquecida con datos de BD - Rol: ' + req.session.user.role + ' - Estado: ' + req.session.user.estado);
             } else {
                 console.warn('⚠️ Usuario no encontrado en BD para enriquecer sesión');
                 req.session.destroy((err) => {
@@ -330,10 +478,25 @@ function authLogger(req, res, next) {
 const checkAuthStatus = async (req, res, next) => {
     // Primero verificar si hay sesión
     if (req.session && req.session.user) {
+        // 🔥 VERIFICAR SI EL USUARIO ESTÁ BLOQUEADO
+        if (req.session.user.estado === 'bloqueado') {
+            Logger.warn(`🚫 Usuario bloqueado detectado en checkAuthStatus: ${req.session.user.nombre}`);
+            req.session.destroy(() => {
+                req.authStatus = {
+                    authenticated: false,
+                    user: null,
+                    method: 'none',
+                    blocked: true
+                };
+                return next();
+            });
+        }
+        
         req.authStatus = {
             authenticated: true,
             user: req.session.user,
-            method: 'session'
+            method: 'session',
+            blocked: false
         };
         return next();
     }
@@ -346,15 +509,30 @@ const checkAuthStatus = async (req, res, next) => {
         try {
             const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret');
             const userQuery = await databaseConfig.queryAsync(
-                'SELECT id, cedula, nombre, correo, role FROM usuarios WHERE id = $1',
+                'SELECT id, cedula, nombre, correo, role, estado FROM usuarios WHERE id = $1',
                 [decoded.userId]
             );
             
             if (userQuery.length > 0) {
+                const usuario = userQuery[0];
+                
+                // 🔥 VERIFICAR SI EL USUARIO ESTÁ BLOQUEADO
+                if (usuario.estado === 'bloqueado') {
+                    Logger.warn(`🚫 Usuario bloqueado detectado en checkAuthStatus (JWT): ${usuario.nombre}`);
+                    req.authStatus = {
+                        authenticated: false,
+                        user: null,
+                        method: 'none',
+                        blocked: true
+                    };
+                    return next();
+                }
+                
                 req.authStatus = {
                     authenticated: true,
-                    user: userQuery[0],
-                    method: 'jwt'
+                    user: usuario,
+                    method: 'jwt',
+                    blocked: false
                 };
                 return next();
             }
@@ -367,7 +545,8 @@ const checkAuthStatus = async (req, res, next) => {
     req.authStatus = {
         authenticated: false,
         user: null,
-        method: 'none'
+        method: 'none',
+        blocked: false
     };
     next();
 };

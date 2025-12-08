@@ -4,7 +4,12 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
+    "dev": "nodemon server.js",
     "db:schema": "node scripts/run_schema.js",
+    "db:migrate:usuarios": "node scripts/migrate-usuarios-estado.js",
+    "db:migrate:all": "npm run db:migrate:usuarios",
+    "db:verify": "node scripts/verify-migration.js",
+    "db:reset": "node scripts/reset-migration.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -27,5 +32,8 @@
     "nodemailer": "^7.0.10",
     "pdfkit": "^0.17.2",
     "pg": "^8.16.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.3"
   }
 }

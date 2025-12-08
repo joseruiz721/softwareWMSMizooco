@@ -6,7 +6,7 @@ const { authenticateToken, requireAdmin, requireRole } = require('../middleware/
 
 const router = express.Router();
 
-// Registro de usuarios - MODIFICADO para incluir roles
+// Registro de usuarios
 router.post("/registro", async (req, res) => {
     const { ced, nom, correo, pass, role = 'user' } = req.body;
 
@@ -31,10 +31,9 @@ router.post("/registro", async (req, res) => {
             });
         }
 
-        // ⭐ NUEVO: Validar rol de administrador
+        // Validar rol de administrador
         let finalRole = 'user';
         if (role === 'admin') {
-            // Verificar clave secreta para crear administradores
             if (req.body.adminSecret === process.env.ADMIN_SECRET) {
                 finalRole = 'admin';
                 console.log('👑 Creando cuenta de administrador para:', correo);
@@ -48,9 +47,9 @@ router.post("/registro", async (req, res) => {
 
         const hashedPassword = await bcrypt.hash(pass, 10);
         
-        // ⭐ MODIFICADO: Incluir campo role en el INSERT
+        // Incluir campo role en el INSERT
         const result = await queryAsync(
-            "INSERT INTO usuarios (cedula, nombre, correo, contrasena, role) VALUES ($1, $2, $3, $4, $5) RETURNING id, cedula, nombre, correo, role",
+            "INSERT INTO usuarios (cedula, nombre, correo, contrasena, role, estado, activo) VALUES ($1, $2, $3, $4, $5, 'activo', true) RETURNING id, cedula, nombre, correo, role, estado",
             [ced, nom, correo, hashedPassword, finalRole]
         );
 
@@ -64,7 +63,8 @@ router.post("/registro", async (req, res) => {
                 cedula: newUser.cedula,
                 nombre: newUser.nombre,
                 correo: newUser.correo,
-                role: newUser.role
+                role: newUser.role,
+                estado: newUser.estado
             },
             redirect: "/index.html" 
         });
@@ -78,7 +78,7 @@ router.post("/registro", async (req, res) => {
     }
 });
 
-// 🔐 NUEVO: Endpoint de login que devuelve JWT y datos de sesión
+// Login mejorado con verificación de estado
 router.post("/login", async (req, res) => {
     const { correo, pass } = req.body;
 
@@ -90,7 +90,7 @@ router.post("/login", async (req, res) => {
     }
 
     try {
-        // Buscar usuario incluyendo el rol
+        // Buscar usuario incluyendo el rol y estado
         const rows = await queryAsync(
             "SELECT * FROM usuarios WHERE correo = $1", 
             [correo]
@@ -114,23 +114,65 @@ router.post("/login", async (req, res) => {
             });
         }
 
-        // ⭐ NUEVO: Generar token JWT
+        // Verificar estado del usuario
+        if (usuario.estado === 'suspendido') {
+            let mensaje = "Tu cuenta está suspendida.";
+            
+            // Verificar si hay fecha de expiración
+            if (usuario.fecha_expiracion_suspension) {
+                const expiracion = new Date(usuario.fecha_expiracion_suspension);
+                if (expiracion > new Date()) {
+                    mensaje += ` La suspensión expira el ${expiracion.toLocaleDateString()}.`;
+                } else {
+                    mensaje += " La suspensión ha expirado. Contacta al administrador.";
+                }
+            }
+            
+            return res.status(403).json({ 
+                success: false, 
+                message: mensaje,
+                estado: 'suspendido'
+            });
+        }
+        
+        if (usuario.estado === 'bloqueado') {
+            return res.status(403).json({ 
+                success: false, 
+                message: "Tu cuenta ha sido bloqueada permanentemente. Contacta al administrador.",
+                estado: 'bloqueado'
+            });
+        }
+        
+        if (!usuario.activo || usuario.estado !== 'activo') {
+            return res.status(403).json({ 
+                success: false, 
+                message: "Tu cuenta está inactiva.",
+                estado: 'inactivo'
+            });
+        }
+
+        // Generar token JWT
         const token = jwt.sign(
-            { userId: usuario.id },
+            { 
+                userId: usuario.id,
+                role: usuario.role,
+                nombre: usuario.nombre 
+            },
             process.env.JWT_SECRET || 'fallback_secret',
             { expiresIn: '24h' }
         );
 
-        // Configurar sesión (código existente)
+        // Configurar sesión
         req.session.user = {
             id: usuario.id,
             cedula: usuario.cedula,
             nombre: usuario.nombre,
             correo: usuario.correo,
-            role: usuario.role // ⭐ AGREGADO: Incluir rol en sesión
+            role: usuario.role,
+            estado: usuario.estado
         };
 
-        console.log(`✅ Login exitoso: ${usuario.nombre} (${usuario.role})`);
+        console.log(`✅ Login exitoso: ${usuario.nombre} (${usuario.role}) - Estado: ${usuario.estado}`);
 
         return res.json({
             success: true,
@@ -140,9 +182,10 @@ router.post("/login", async (req, res) => {
                 cedula: usuario.cedula,
                 nombre: usuario.nombre,
                 correo: usuario.correo,
-                role: usuario.role // ⭐ AGREGADO: Incluir rol en respuesta
+                role: usuario.role,
+                estado: usuario.estado
             },
-            token: token, // ⭐ NUEVO: Incluir token JWT
+            token: token,
             redirect: "/paginaPrincipal.html"
         });
 
@@ -155,7 +198,7 @@ router.post("/login", async (req, res) => {
     }
 });
 
-// 🔐 NUEVO: Endpoint para verificar token y obtener datos de usuario
+// Verificar token
 router.get("/verify", authenticateToken, async (req, res) => {
     try {
         return res.json({
@@ -171,7 +214,7 @@ router.get("/verify", authenticateToken, async (req, res) => {
     }
 });
 
-// Obtener perfil de usuario - MEJORADO para incluir rol
+// Obtener perfil de usuario
 router.get("/perfil", async (req, res) => {
     try {
         if (!req.session?.user?.id) {
@@ -181,9 +224,8 @@ router.get("/perfil", async (req, res) => {
             });
         }
 
-        // ⭐ MODIFICADO: Incluir campo role en la consulta
         const rows = await queryAsync(
-            "SELECT id, cedula, nombre, correo, role, fecha_registro FROM usuarios WHERE id = $1", 
+            "SELECT id, cedula, nombre, correo, role, estado, fecha_registro FROM usuarios WHERE id = $1", 
             [req.session.user.id]
         );
         
@@ -217,7 +259,7 @@ router.get("/perfil", async (req, res) => {
     }
 });
 
-// Actualizar perfil de usuario - MEJORADO para validar roles
+// Actualizar perfil de usuario
 router.put("/perfil", async (req, res) => {
     try {
         const userId = req.session.user.id;
@@ -232,14 +274,13 @@ router.put("/perfil", async (req, res) => {
             });
         }
 
-        // ⭐ NUEVO: Verificar permisos para cambiar rol
+        // Verificar permisos para cambiar rol
         if (role) {
             const currentUser = await queryAsync(
                 "SELECT role FROM usuarios WHERE id = $1",
                 [userId]
             );
             
-            // Solo administradores pueden cambiar roles
             if (currentUser[0].role !== 'admin') {
                 return res.status(403).json({
                     success: false,
@@ -247,7 +288,6 @@ router.put("/perfil", async (req, res) => {
                 });
             }
             
-            // No permitir que un admin se quite sus propios privilegios
             if (role !== 'admin' && userId === req.session.user.id) {
                 return res.status(403).json({
                     success: false,
@@ -311,7 +351,6 @@ router.put("/perfil", async (req, res) => {
             paramCount++;
         }
 
-        // ⭐ NUEVO: Actualizar rol si se proporciona y tiene permisos
         if (role) {
             updates.push(`role = $${paramCount}`);
             values.push(role);
@@ -325,14 +364,12 @@ router.put("/perfil", async (req, res) => {
 
         await queryAsync(sql, values);
 
-        // ⭐ MODIFICADO: Incluir campo role en la consulta de actualización
         const updatedUser = await queryAsync(
-            "SELECT id, cedula, nombre, correo, role, fecha_registro FROM usuarios WHERE id = $1",
+            "SELECT id, cedula, nombre, correo, role, estado, fecha_registro FROM usuarios WHERE id = $1",
             [userId]
         );
 
         if (updatedUser.length > 0) {
-            // Actualizar sesión con nuevos datos
             req.session.user = {
                 ...req.session.user,
                 ...updatedUser[0]
@@ -355,7 +392,7 @@ router.put("/perfil", async (req, res) => {
     }
 });
 
-// Eliminar cuenta de usuario - MEJORADO con validación de roles
+// Eliminar cuenta de usuario
 router.delete("/perfil", async (req, res) => {
     try {
         const userId = req.session.user.id;
@@ -370,22 +407,25 @@ router.delete("/perfil", async (req, res) => {
             });
         }
 
-        // ⭐ NUEVO: Verificar si es el último administrador
         if (userExists[0].role === 'admin') {
             const adminCount = await queryAsync(
-                "SELECT COUNT(*) as count FROM usuarios WHERE role = 'admin'",
+                "SELECT COUNT(*) as count FROM usuarios WHERE role = 'admin' AND estado = 'activo'",
                 []
             );
             
             if (parseInt(adminCount[0].count) <= 1) {
                 return res.status(403).json({
                     success: false,
-                    message: "No puedes eliminar la única cuenta de administrador del sistema."
+                    message: "No puedes eliminar la única cuenta de administrador activa del sistema."
                 });
             }
         }
 
-        await queryAsync("DELETE FROM usuarios WHERE id = $1", [userId]);
+        // Soft delete: cambiar estado a suspendido
+        await queryAsync(
+            "UPDATE usuarios SET estado = 'suspendido', activo = false, fecha_suspension = CURRENT_TIMESTAMP WHERE id = $1",
+            [userId]
+        );
 
         req.session.destroy((err) => {
             if (err) {
@@ -395,7 +435,7 @@ router.delete("/perfil", async (req, res) => {
 
         return res.json({
             success: true,
-            message: "Cuenta eliminada correctamente. Lamentamos verte ir."
+            message: "Cuenta suspendida correctamente. Puede ser reactivada por un administrador."
         });
 
     } catch (error) {
@@ -408,11 +448,11 @@ router.delete("/perfil", async (req, res) => {
     }
 });
 
-// 🔐 NUEVO: Endpoint para obtener todos los usuarios (solo admin)
+// Obtener todos los usuarios (solo admin)
 router.get("/usuarios", authenticateToken, requireAdmin, async (req, res) => {
     try {
         const users = await queryAsync(
-            "SELECT id, cedula, nombre, correo, role, fecha_registro FROM usuarios ORDER BY id"
+            "SELECT id, cedula, nombre, correo, role, estado, fecha_registro, fecha_suspension, fecha_expiracion_suspension, fecha_bloqueo FROM usuarios ORDER BY id"
         );
         
         return res.json({
@@ -429,11 +469,11 @@ router.get("/usuarios", authenticateToken, requireAdmin, async (req, res) => {
     }
 });
 
-// 🔐 Endpoint para obtener lista simple (usada por la UI: /api/admin/usuarios/lista)
+// Obtener lista simple de usuarios
 router.get("/lista", authenticateToken, requireAdmin, async (req, res) => {
     try {
         const users = await queryAsync(
-            "SELECT id, cedula, nombre, correo, role, fecha_registro FROM usuarios ORDER BY id"
+            "SELECT id, cedula, nombre, correo, role, estado, fecha_registro FROM usuarios ORDER BY nombre"
         );
         return res.json({ success: true, data: users });
     } catch (error) {
@@ -442,28 +482,21 @@ router.get("/lista", authenticateToken, requireAdmin, async (req, res) => {
     }
 });
 
-// 🔐 Endpoint para obtener usuarios inactivos (si la columna `activo` existe)
+// Obtener usuarios inactivos
 router.get("/inactivos", authenticateToken, requireAdmin, async (req, res) => {
     try {
-        // Intentar recuperar usuarios con `activo = false` si la columna está presente
-        try {
-            const rows = await queryAsync(
-                "SELECT id, cedula, nombre, correo, role, fecha_registro FROM usuarios WHERE activo = false ORDER BY nombre"
-            );
-            return res.json({ success: true, data: rows });
-        } catch (err) {
-            // Si falla porque la columna no existe, devolver lista vacía y loguear advertencia
-            console.warn('⚠️ columna `activo` no encontrada en `usuarios`; devolviendo lista vacía para inactivos', err.message);
-            return res.json({ success: true, data: [] });
-        }
+        const rows = await queryAsync(
+            "SELECT id, cedula, nombre, correo, role, estado, fecha_registro FROM usuarios WHERE estado != 'activo' ORDER BY nombre"
+        );
+        return res.json({ success: true, data: rows });
     } catch (error) {
         console.error('❌ Error obteniendo usuarios inactivos:', error.message);
         return res.status(500).json({ success: false, message: 'Error al obtener usuarios inactivos.' });
     }
 });
 
-// 🔐 NUEVO: Endpoint para cambiar rol de usuario (solo admin)
-router.put("/usuarios/:id/role", authenticateToken, requireAdmin, async (req, res) => {
+// Cambiar rol de usuario
+router.put("/:id/role", authenticateToken, requireAdmin, async (req, res) => {
     try {
         const { id } = req.params;
         const { role } = req.body;
@@ -475,7 +508,6 @@ router.put("/usuarios/:id/role", authenticateToken, requireAdmin, async (req, re
             });
         }
 
-        // No permitir cambiar el propio rol
         if (parseInt(id) === req.user.id) {
             return res.status(403).json({
                 success: false,
@@ -483,7 +515,10 @@ router.put("/usuarios/:id/role", authenticateToken, requireAdmin, async (req, re
             });
         }
 
-        const userExists = await queryAsync("SELECT id FROM usuarios WHERE id = $1", [id]);
+        const userExists = await queryAsync(
+            "SELECT id, nombre, role FROM usuarios WHERE id = $1",
+            [id]
+        );
         if (userExists.length === 0) {
             return res.status(404).json({
                 success: false,
@@ -491,13 +526,30 @@ router.put("/usuarios/:id/role", authenticateToken, requireAdmin, async (req, re
             });
         }
 
+        const usuario = userExists[0];
+
+        // Verificar si es el último administrador activo
+        if (usuario.role === 'admin' && role === 'user') {
+            const adminCount = await queryAsync(
+                "SELECT COUNT(*) as count FROM usuarios WHERE role = 'admin' AND estado = 'activo' AND id != $1",
+                [id]
+            );
+            
+            if (parseInt(adminCount[0].count) < 1) {
+                return res.status(403).json({
+                    success: false,
+                    message: "No se puede quitar el rol de administrador. Debe haber al menos un administrador activo."
+                });
+            }
+        }
+
         await queryAsync("UPDATE usuarios SET role = $1 WHERE id = $2", [role, id]);
 
-        console.log(`👑 Rol actualizado: Usuario ${id} ahora es ${role}`);
+        console.log(`👑 Rol actualizado: Usuario ${usuario.nombre} (${id}) ahora es ${role}`);
 
         return res.json({
             success: true,
-            message: `Rol actualizado a ${role} correctamente.`
+            message: `Rol de ${usuario.nombre} actualizado a ${role} correctamente.`
         });
 
     } catch (error) {
@@ -510,7 +562,280 @@ router.put("/usuarios/:id/role", authenticateToken, requireAdmin, async (req, re
     }
 });
 
-// 🔐 NUEVO: Endpoint para eliminar usuario (solo admin)
+// Suspender usuario
+router.put("/:id/suspender", authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { motivo, duracion_dias } = req.body;
+
+        // No permitir suspenderse a sí mismo
+        if (parseInt(id) === req.user.id) {
+            return res.status(403).json({
+                success: false,
+                message: "No puedes suspender tu propia cuenta."
+            });
+        }
+
+        const userExists = await queryAsync(
+            "SELECT id, nombre, role, estado FROM usuarios WHERE id = $1",
+            [id]
+        );
+
+        if (userExists.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: "Usuario no encontrado."
+            });
+        }
+
+        const usuario = userExists[0];
+
+        if (usuario.estado === 'suspendido') {
+            return res.status(400).json({
+                success: false,
+                message: "El usuario ya está suspendido."
+            });
+        }
+
+        // Verificar si es el último administrador activo
+        if (usuario.role === 'admin' && usuario.estado === 'activo') {
+            const adminCount = await queryAsync(
+                "SELECT COUNT(*) as count FROM usuarios WHERE role = 'admin' AND estado = 'activo' AND id != $1",
+                [id]
+            );
+            
+            if (parseInt(adminCount[0].count) < 1) {
+                return res.status(403).json({
+                    success: false,
+                    message: "No puedes suspender la única cuenta de administrador activa."
+                });
+            }
+        }
+
+        // Calcular fecha de expiración
+        let fecha_expiracion = null;
+        if (duracion_dias && duracion_dias > 0) {
+            const fecha = new Date();
+            fecha.setDate(fecha.getDate() + parseInt(duracion_dias));
+            fecha_expiracion = fecha.toISOString();
+        }
+
+        // Actualizar estado
+        await queryAsync(
+            `UPDATE usuarios 
+             SET estado = 'suspendido', 
+                 activo = false, 
+                 fecha_suspension = CURRENT_TIMESTAMP, 
+                 fecha_expiracion_suspension = $1 
+             WHERE id = $2`,
+            [fecha_expiracion, id]
+        );
+
+        console.log(`⏸️ Usuario ${usuario.nombre} suspendido por administrador ${req.user?.nombre}`);
+
+        return res.json({
+            success: true,
+            message: `Usuario ${usuario.nombre} suspendido exitosamente.`,
+            data: {
+                id: usuario.id,
+                nombre: usuario.nombre,
+                estado: 'suspendido',
+                fecha_expiracion: fecha_expiracion,
+                duracion_dias: duracion_dias
+            }
+        });
+
+    } catch (error) {
+        console.error("❌ Error suspendiendo usuario:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Error al suspender usuario.",
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+    }
+});
+
+// Activar usuario
+router.put("/:id/activar", authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { motivo } = req.body;
+
+        const userExists = await queryAsync(
+            "SELECT id, nombre, estado FROM usuarios WHERE id = $1",
+            [id]
+        );
+
+        if (userExists.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: "Usuario no encontrado."
+            });
+        }
+
+        const usuario = userExists[0];
+
+        if (usuario.estado === 'activo') {
+            return res.status(400).json({
+                success: false,
+                message: "El usuario ya está activo."
+            });
+        }
+
+        // Activar usuario
+        await queryAsync(
+            `UPDATE usuarios 
+             SET estado = 'activo', 
+                 activo = true, 
+                 fecha_suspension = NULL, 
+                 fecha_expiracion_suspension = NULL,
+                 fecha_bloqueo = NULL 
+             WHERE id = $1`,
+            [id]
+        );
+
+        console.log(`✅ Usuario ${usuario.nombre} activado por administrador ${req.user?.nombre}`);
+
+        return res.json({
+            success: true,
+            message: `Usuario ${usuario.nombre} activado exitosamente.`,
+            data: {
+                id: usuario.id,
+                nombre: usuario.nombre,
+                estado: 'activo'
+            }
+        });
+
+    } catch (error) {
+        console.error("❌ Error activando usuario:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Error al activar usuario.",
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+    }
+});
+
+// Bloquear usuario
+router.put("/:id/bloquear", authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { motivo } = req.body;
+
+        // No permitir bloquearse a sí mismo
+        if (parseInt(id) === req.user.id) {
+            return res.status(403).json({
+                success: false,
+                message: "No puedes bloquear tu propia cuenta."
+            });
+        }
+
+        const userExists = await queryAsync(
+            "SELECT id, nombre, role, estado FROM usuarios WHERE id = $1",
+            [id]
+        );
+
+        if (userExists.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: "Usuario no encontrado."
+            });
+        }
+
+        const usuario = userExists[0];
+
+        if (usuario.estado === 'bloqueado') {
+            return res.status(400).json({
+                success: false,
+                message: "El usuario ya está bloqueado."
+            });
+        }
+
+        // Verificar si es el último administrador activo
+        if (usuario.role === 'admin' && usuario.estado === 'activo') {
+            const adminCount = await queryAsync(
+                "SELECT COUNT(*) as count FROM usuarios WHERE role = 'admin' AND estado = 'activo' AND id != $1",
+                [id]
+            );
+            
+            if (parseInt(adminCount[0].count) < 1) {
+                return res.status(403).json({
+                    success: false,
+                    message: "No puedes bloquear la única cuenta de administrador activa."
+                });
+            }
+        }
+
+        // Bloquear usuario
+        await queryAsync(
+            `UPDATE usuarios 
+             SET estado = 'bloqueado', 
+                 activo = false, 
+                 fecha_bloqueo = CURRENT_TIMESTAMP 
+             WHERE id = $1`,
+            [id]
+        );
+
+        console.log(`🚫 Usuario ${usuario.nombre} bloqueado por administrador ${req.user?.nombre}`);
+
+        return res.json({
+            success: true,
+            message: `Usuario ${usuario.nombre} bloqueado permanentemente.`,
+            data: {
+                id: usuario.id,
+                nombre: usuario.nombre,
+                estado: 'bloqueado',
+                fecha_bloqueo: new Date()
+            }
+        });
+
+    } catch (error) {
+        console.error("❌ Error bloqueando usuario:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Error al bloquear usuario.",
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+    }
+});
+
+// Obtener usuarios por estado
+router.get("/usuarios/estado/:estado", authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const { estado } = req.params;
+        
+        if (!['activo', 'suspendido', 'bloqueado'].includes(estado)) {
+            return res.status(400).json({
+                success: false,
+                message: "Estado inválido. Use: activo, suspendido o bloqueado."
+            });
+        }
+
+        const users = await queryAsync(
+            `SELECT id, cedula, nombre, correo, role, estado, fecha_registro, 
+                    fecha_suspension, fecha_expiracion_suspension, fecha_bloqueo
+             FROM usuarios 
+             WHERE estado = $1 
+             ORDER BY nombre`,
+            [estado]
+        );
+        
+        return res.json({
+            success: true,
+            data: users,
+            count: users.length
+        });
+    } catch (error) {
+        console.error("❌ Error obteniendo usuarios por estado:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Error al obtener usuarios.",
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+    }
+});
+
+// Eliminar usuario (soft delete)
 router.delete("/usuarios/:id", authenticateToken, requireAdmin, async (req, res) => {
     try {
         const { id } = req.params;
@@ -523,7 +848,11 @@ router.delete("/usuarios/:id", authenticateToken, requireAdmin, async (req, res)
             });
         }
 
-        const userExists = await queryAsync("SELECT id, role FROM usuarios WHERE id = $1", [id]);
+        const userExists = await queryAsync(
+            "SELECT id, nombre, role, estado FROM usuarios WHERE id = $1",
+            [id]
+        );
+        
         if (userExists.length === 0) {
             return res.status(404).json({
                 success: false,
@@ -531,28 +860,41 @@ router.delete("/usuarios/:id", authenticateToken, requireAdmin, async (req, res)
             });
         }
 
-        // Verificar si es el último administrador
-        if (userExists[0].role === 'admin') {
+        const usuario = userExists[0];
+
+        // Verificar si es el último administrador activo
+        if (usuario.role === 'admin' && usuario.estado === 'activo') {
             const adminCount = await queryAsync(
-                "SELECT COUNT(*) as count FROM usuarios WHERE role = 'admin'",
-                []
+                "SELECT COUNT(*) as count FROM usuarios WHERE role = 'admin' AND estado = 'activo' AND id != $1",
+                [id]
             );
             
-            if (parseInt(adminCount[0].count) <= 1) {
+            if (parseInt(adminCount[0].count) < 1) {
                 return res.status(403).json({
                     success: false,
-                    message: "No puedes eliminar la única cuenta de administrador del sistema."
+                    message: "No puedes eliminar la única cuenta de administrador activa del sistema."
                 });
             }
         }
 
-        await queryAsync("DELETE FROM usuarios WHERE id = $1", [id]);
+        // Soft delete: suspender en lugar de eliminar
+        await queryAsync(
+            "UPDATE usuarios SET estado = 'suspendido', activo = false, fecha_suspension = CURRENT_TIMESTAMP WHERE id = $1",
+            [id]
+        );
 
-        console.log(`🗑️ Usuario ${id} eliminado por administrador ${req.user?.nombre || 'Unknown'}`);
+        console.log(`🗑️ Usuario ${usuario.nombre} suspendido (soft delete) por administrador ${req.user?.nombre}`);
 
         return res.json({
             success: true,
-            message: "Usuario eliminado correctamente."
+            message: `Usuario ${usuario.nombre} suspendido correctamente.`,
+            tipo: 'soft_delete',
+            data: {
+                id: usuario.id,
+                nombre: usuario.nombre,
+                estado: 'suspendido',
+                accion: 'suspension_por_eliminacion'
+            }
         });
 
     } catch (error) {

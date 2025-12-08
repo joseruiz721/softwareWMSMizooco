@@ -141,8 +141,9 @@ app.use((req, res, next) => {
 // RUTAS PRINCIPALES - PERMISOS ACTUALIZADOS
 // ==============================================
 
-// Rutas de autenticación (públicas)
-app.use('/auth', authRoutes);
+// 🔥 CORREGIDO: Montar rutas de autenticación en ambas ubicaciones para compatibilidad
+app.use('/auth', authRoutes); // Para compatibilidad con rutas existentes
+app.use('/api/auth', authRoutes); // Para nuevas rutas API
 
 // Rutas de API - TODOS LOS USUARIOS AUTENTICADOS PUEDEN ACCEDER
 app.use('/api/usuarios', optionalToken, usuarioRoutes);
@@ -159,25 +160,57 @@ app.use('/api/asistencias', requireAuth, asistenciasRoutes);
 
 // RUTAS DE ADMINISTRACIÓN (SOLO PARA ADMINS)
 app.use('/api/admin/usuarios', authenticateToken, requireAdmin, usuarioRoutes);
-
 // ==============================================
-// 🔥 NUEVAS RUTAS PARA SISTEMA MULTI-USUARIO DE ASISTENCIAS
+// 🔥 RUTAS ESPECÍFICAS PARA GESTIÓN DE USUARIOS
 // ==============================================
+// 🔥 Obtener todos los usuarios (solo para admins) - EXCLUYENDO INACTIVOS
+app.get('/api/admin/usuarios/lista', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        Logger.info('Solicitando lista completa de usuarios', {
+            usuario: req.user?.nombre || 'Unknown'
+        });
 
+        const users = await databaseConfig.queryAsync(
+            `SELECT id, cedula, nombre, correo, role, fecha_registro, estado
+             FROM usuarios 
+             WHERE estado != 'inactivo'  -- 🔥 EXCLUIR USUARIOS INACTIVOS
+             ORDER BY fecha_registro DESC`
+        );
+
+        Logger.info(`Lista de usuarios enviada: ${users.length} usuarios`, {
+            usuario: req.user?.nombre || 'Unknown'
+        });
+
+        res.json({
+            success: true,
+            data: users
+        });
+
+    } catch (error) {
+        Logger.error('Error obteniendo lista de usuarios', {
+            error: error.message,
+            usuario: req.user?.nombre || 'Unknown'
+        });
+        res.status(500).json({
+            success: false,
+            message: 'Error al obtener la lista de usuarios'
+        });
+    }
+});
 // 🔥 Ruta para obtener usuarios activos - MODIFICADA
 app.get('/api/usuarios/activos', requireAuth, async (req, res) => {
     try {
         console.log('📋 Solicitando lista de usuarios activos...');
         
-        // Query para obtener todos los usuarios activos
+        // Query para obtener todos los usuarios activos (solo activos, no inactivos/bloqueados/suspendidos)
         const rows = await databaseConfig.queryAsync(
             `SELECT id, cedula, nombre, correo, role, fecha_registro 
              FROM usuarios 
-             WHERE role IN ('admin', 'user', 'tecnico')
+             WHERE estado = 'activo'  -- 🔥 SOLO ACTIVOS
              ORDER BY nombre ASC`
         );
         
-        console.log(`✅ ${rows.length} usuarios cargados para selector`);
+        console.log(`✅ ${rows.length} usuarios activos cargados para selector`);
         
         res.json({
             success: true,
@@ -343,7 +376,8 @@ app.get('/api/check-admin', requireAuth, (req, res) => {
             id: req.session.user.id,
             nombre: req.session.user.nombre,
             correo: req.session.user.correo,
-            role: req.session.user.role
+            role: req.session.user.role,
+            estado: req.session.user.estado || 'activo'
         } : null
     });
 });
@@ -362,7 +396,7 @@ app.get('/api/auth-status', checkAuthStatus, (req, res) => {
 app.get('/api/usuarios/perfil', authenticateToken, async (req, res) => {
     try {
         const userData = await databaseConfig.queryAsync(
-            `SELECT id, cedula, nombre, correo, role, fecha_registro 
+            `SELECT id, cedula, nombre, correo, role, fecha_registro, estado
              FROM usuarios WHERE id = $1`,
             [req.user.id]
         );
@@ -390,43 +424,70 @@ app.get('/api/usuarios/perfil', authenticateToken, async (req, res) => {
     }
 });
 
-// ==============================================
-// NUEVAS RUTAS PARA GESTIÓN DE USUARIOS EN PÁGINA PRINCIPAL
-// ==============================================
-
-// 🔐 Obtener lista completa de usuarios (solo para admins)
-app.get('/api/admin/usuarios/lista', authenticateToken, requireAdmin, async (req, res) => {
+// 🔥 NUEVO: Endpoint para cambiar estado de usuario (bloquear/activar)
+app.put('/api/admin/usuarios/:id/estado', authenticateToken, requireAdmin, async (req, res) => {
     try {
-        Logger.info('Solicitando lista completa de usuarios', {
-            usuario: req.user?.nombre || 'Unknown'
-        });
+        const { id } = req.params;
+        const { estado, motivo } = req.body;
 
-        const users = await databaseConfig.queryAsync(
-            `SELECT id, cedula, nombre, correo, role, fecha_registro
-             FROM usuarios 
-             ORDER BY nombre ASC`
+        if (!estado || !['activo', 'bloqueado', 'suspendido'].includes(estado)) {
+            return res.status(400).json({
+                success: false,
+                message: "Estado inválido. Debe ser 'activo', 'bloqueado' o 'suspendido'."
+            });
+        }
+
+        if (parseInt(id) === req.user.id) {
+            return res.status(403).json({
+                success: false,
+                message: "No puedes cambiar tu propio estado."
+            });
+        }
+
+        const userExists = await databaseConfig.queryAsync(
+            "SELECT id, nombre, correo FROM usuarios WHERE id = $1", 
+            [id]
+        );
+        
+        if (userExists.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: "Usuario no encontrado."
+            });
+        }
+
+        await databaseConfig.queryAsync(
+            "UPDATE usuarios SET estado = $1 WHERE id = $2", 
+            [estado, id]
         );
 
-        Logger.info(`Lista de usuarios enviada: ${users.length} usuarios`, {
-            usuario: req.user?.nombre || 'Unknown'
-        });
+        const usuario = userExists[0];
+        console.log(`🔐 Estado actualizado: Usuario ${usuario.nombre} (${id}) ahora está ${estado}`);
 
-        res.json({
+        return res.json({
             success: true,
-            data: users
+            message: `Estado actualizado a ${estado} correctamente.`,
+            user: {
+                id: usuario.id,
+                nombre: usuario.nombre,
+                correo: usuario.correo,
+                estado: estado
+            }
         });
 
     } catch (error) {
-        Logger.error('Error obteniendo lista de usuarios', {
-            error: error.message,
-            usuario: req.user?.nombre || 'Unknown'
-        });
-        res.status(500).json({
+        console.error("❌ Error actualizando estado:", error);
+        return res.status(500).json({
             success: false,
-            message: 'Error al obtener la lista de usuarios'
+            message: "Error al actualizar estado.",
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
         });
     }
 });
+
+// ==============================================
+// RUTAS DE ADMINISTRACIÓN (COMPATIBILIDAD)
+// ==============================================
 
 // 🔐 Cambiar rol de usuario (solo para admins)
 app.put('/api/admin/usuarios/:id/rol', authenticateToken, requireAdmin, async (req, res) => {
@@ -452,14 +513,14 @@ app.put('/api/admin/usuarios/:id/rol', authenticateToken, requireAdmin, async (r
         // Verificar que no sea el último administrador
         if (role === 'user') {
             const adminCount = await databaseConfig.queryAsync(
-                'SELECT COUNT(*) as count FROM usuarios WHERE role = $1 AND id != $2',
-                ['admin', userId]
+                'SELECT COUNT(*) as count FROM usuarios WHERE role = $1 AND id != $2 AND estado = $3',
+                ['admin', userId, 'activo']
             );
 
             if (parseInt(adminCount[0].count) === 0) {
                 return res.status(400).json({
                     success: false,
-                    message: 'No puedes quitar el rol de administrador al último admin del sistema'
+                    message: 'No puedes quitar el rol de administrador al último admin activo del sistema'
                 });
             }
         }
@@ -527,7 +588,7 @@ app.delete('/api/admin/usuarios/:id', authenticateToken, requireAdmin, async (re
             });
         }
 
-        // === NUEVO: Comprobar dependencias que impiden la eliminación ===
+        // === Comprobar dependencias que impiden la eliminación ===
         const dependencyChecks = [
             { name: 'ordenadores_responsable', sql: 'SELECT COUNT(*) as count FROM ordenadores WHERE id_usuario_responsable = $1' },
             { name: 'access_point_responsable', sql: 'SELECT COUNT(*) as count FROM access_point WHERE id_usuarios_responsable = $1' },
@@ -540,9 +601,7 @@ app.delete('/api/admin/usuarios/:id', authenticateToken, requireAdmin, async (re
             { name: 'asistencias_registrante', sql: 'SELECT COUNT(*) as count FROM asistencias WHERE registrante_id = $1' }
         ];
 
-        // Ejecutar las comprobaciones de dependencia de forma segura: si una consulta falla
-        // (por ejemplo, porque la columna no existe en la base de datos), registramos
-        // la advertencia y tratamos esa dependencia como 0 para evitar romper la operación.
+        // Ejecutar las comprobaciones de dependencia
         const checksResults = await Promise.all(dependencyChecks.map(async (dc) => {
             try {
                 const rows = await databaseConfig.queryAsync(dc.sql, [userId]);
@@ -575,24 +634,25 @@ app.delete('/api/admin/usuarios/:id', authenticateToken, requireAdmin, async (re
             });
         }
 
-        // Verificar que no sea el último administrador
-        if (user[0].role === 'admin') {
-            const adminCount = await databaseConfig.queryAsync(
-                'SELECT COUNT(*) as count FROM usuarios WHERE role = $1 AND id != $2',
-                ['admin', userId]
-            );
+     // En la ruta DELETE /api/admin/usuarios/:id, busca esta parte:
+// Verificar que no sea el último administrador
+if (user[0].role === 'admin') {
+    const adminCount = await databaseConfig.queryAsync(
+        'SELECT COUNT(*) as count FROM usuarios WHERE role = $1 AND id != $2 AND estado = $3',
+        ['admin', userId, 'activo']
+    );
 
-            if (parseInt(adminCount[0].count) === 0) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'No puedes eliminar al último administrador del sistema'
-                });
-            }
-        }
+    if (parseInt(adminCount[0].count) === 0) {
+        return res.status(400).json({
+            success: false,
+            message: 'No puedes eliminar al último administrador activo del sistema'
+        });
+    }
+}
 
-        // Eliminar el usuario
+        // Usar eliminación lógica (marcar como eliminado)
         await databaseConfig.queryAsync(
-            'DELETE FROM usuarios WHERE id = $1',
+            "UPDATE usuarios SET estado = 'eliminado', correo = CONCAT(correo, '_eliminado_', EXTRACT(EPOCH FROM NOW())) WHERE id = $1", 
             [userId]
         );
 
@@ -1241,7 +1301,7 @@ app.listen(PORT, async () => {
     console.log('👑 Ruta de administración: /api/admin/*');
     console.log('🔒 Middleware de autenticación JWT configurado');
     console.log('🔑 Ruta de registro de administradores: /admin-register');
-     console.log('🔄 Sistema MULTI-USUARIO de asistencias activado');
+    console.log('🔄 Sistema MULTI-USUARIO de asistencias activado');
     console.log('📊 Nuevo sistema de asistencias:');
     console.log('   - TODOS los usuarios pueden registrar para otros');
     console.log('   - Solo ADMIN pueden ver reportes completos');
@@ -1251,6 +1311,7 @@ app.listen(PORT, async () => {
     console.log('📊 Nuevas rutas de administración:');
     console.log('   - GET /api/admin/usuarios/lista');
     console.log('   - PUT /api/admin/usuarios/:id/rol');
+    console.log('   - PUT /api/admin/usuarios/:id/estado');
     console.log('   - DELETE /api/admin/usuarios/:id');
     console.log('📸 Sistema de asistencias MULTI-USUARIO activado');
     console.log('   - POST /api/asistencias/registrar-multi (solo admin)');
