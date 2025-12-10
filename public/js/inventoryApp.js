@@ -44,7 +44,7 @@ const InventoryApp = {
         tablets: {
             name: 'Tablets',
             table: 'tablets',
-            fields: ['id', 'ip', 'ubicacion', 'no_maquina', 'activo', 'serial', 'estado', 'fecha_ingreso', 'observaciones', 'id_usuario_responsable', 'activo_fijo']
+            fields: ['id', 'ip', 'ubicacion', 'activo', 'serial', 'estado', 'fecha_ingreso', 'observaciones', 'id_usuario_responsable', 'activo_fijo']
         },
         lectores_qr: {
             name: 'Lectores QR',
@@ -297,6 +297,11 @@ const InventoryApp = {
 
     buildDeviceDetails: function(device) {
         const details = [];
+        
+        if (device.tipo_detalle && device.tipo_detalle.toLowerCase() === 'readers') {
+            if (device.no_maquina) details.push(`Máquina: ${device.no_maquina}`);
+        }
+        
         if (device.serial) details.push(`Serial: ${device.serial}`);
         if (device.ip) details.push(`IP: ${device.ip}`);
         if (device.ubicacion) details.push(`Ubicación: ${device.ubicacion}`);
@@ -480,7 +485,7 @@ const InventoryApp = {
     },
 
     // ==============================================
-    // MÉTODOS DE CARGA DE DATOS (sin cambios)
+    // MÉTODOS DE CARGA DE DATOS
     // ==============================================
 
     loadAllData: async function() {
@@ -605,7 +610,7 @@ const InventoryApp = {
     },
 
     // ==============================================
-    // MÉTODOS DE INTERFAZ DE USUARIO (sin cambios)
+    // MÉTODOS DE INTERFAZ DE USUARIO
     // ==============================================
 
     updateStatsUI: function(stats) {
@@ -621,46 +626,111 @@ const InventoryApp = {
     },
 
     updateDeviceTable: function(devices) {
+        const tableHead = document.getElementById('devices-table-head');
         const tableBody = document.getElementById('devices-table-body');
-        if (!tableBody) return;
+        
+        if (!tableHead || !tableBody) return;
+        
+        // 👇 ACTUALIZAR TÍTULOS SEGÚN EL TIPO
+        if (this.currentTable === 'readers') {
+            tableHead.innerHTML = `
+                <th>Serial</th>
+                <th>IP</th>
+                <th>Ubicación</th>
+                <th>No. Máquina</th>
+                <th>Activo Fijo</th>
+                <th>Estado</th>
+                <th>Observaciones</th>
+                <th>Acciones</th>
+            `;
+        } else {
+            tableHead.innerHTML = `
+                <th>Serial</th>
+                <th>IP</th>
+                <th>Ubicación</th>
+                <th>Activo Fijo</th>
+                <th>Estado</th>
+                <th>Observaciones</th>
+                <th>Acciones</th>
+            `;
+        }
         
         if (!devices || devices.length === 0) {
-            tableBody.innerHTML = '<tr><td colspan="7" class="no-data">No hay dispositivos registrados</td></tr>';
+            // Usar colspan dinámico según el tipo
+            const colspan = this.currentTable === 'readers' ? '8' : '7';
+            tableBody.innerHTML = `<tr><td colspan="${colspan}" class="no-data">No hay dispositivos registrados</td></tr>`;
             return;
         }
         
         tableBody.innerHTML = devices.map(device => {
             const statusClass = this.getStatusClass(device.estado);
             
-            const fields = {
-                serial: device.serial || 'No especificado',
-                ip: device.ip || 'N/A',
-                ubicacion: device.ubicacion || 'No especificada',
-                activo_fijo: device.activo_fijo || 'No asignado',
-                estado: device.estado || 'Desconocido',
-                observaciones: device.observaciones || device.observacion || 'Ninguna'
-            };
-            
-            return `
-                <tr data-id="${device.id}">
-                    <td>${fields.serial}</td>
-                    <td>${fields.ip}</td>
-                    <td>${fields.ubicacion}</td>
-                    <td>${fields.activo_fijo}</td>
-                    <td><span class="status-badge ${statusClass}">${fields.estado}</span></td>
-                    <td>${fields.observaciones}</td>
-                    <td>
-                        <div class="action-buttons">
-                            <button class="btn-action btn-edit" onclick="InventoryApp.editDevice('${this.currentTable}', ${device.id})" title="Editar">
-                                <i class="fas fa-edit"></i>
-                            </button>
-                            <button class="btn-action btn-delete" onclick="InventoryApp.deleteDevice('${this.currentTable}', ${device.id})" title="Eliminar">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                        </div>
-                    </td>
-                </tr>
-            `;
+            // 👇 DIFERENCIAR ENTRE READERS Y OTROS TIPOS
+            if (this.currentTable === 'readers') {
+                // Para READERS: incluir columna de no_maquina
+                const fields = {
+                    serial: device.serial || 'No especificado',
+                    ip: device.ip || 'N/A',
+                    ubicacion: device.ubicacion || 'No especificada',
+                    no_maquina: device.no_maquina || 'No asignado',
+                    activo_fijo: device.activo_fijo || 'No asignado',
+                    estado: device.estado || 'Desconocido',
+                    observaciones: device.observaciones || device.observacion || 'Ninguna'
+                };
+                
+                return `
+                    <tr data-id="${device.id}">
+                        <td>${fields.serial}</td>
+                        <td>${fields.ip}</td>
+                        <td>${fields.ubicacion}</td>
+                        <td>${fields.no_maquina}</td>
+                        <td>${fields.activo_fijo}</td>
+                        <td><span class="status-badge ${statusClass}">${fields.estado}</span></td>
+                        <td>${fields.observaciones}</td>
+                        <td>
+                            <div class="action-buttons">
+                                <button class="btn-action btn-edit" onclick="InventoryApp.editDevice('${this.currentTable}', ${device.id})" title="Editar">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn-action btn-delete" onclick="InventoryApp.deleteDevice('${this.currentTable}', ${device.id})" title="Eliminar">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            } else {
+                // Para otros tipos: SIN columna de no_maquina
+                const fields = {
+                    serial: device.serial || 'No especificado',
+                    ip: device.ip || 'N/A',
+                    ubicacion: device.ubicacion || 'No especificada',
+                    activo_fijo: device.activo_fijo || 'No asignado',
+                    estado: device.estado || 'Desconocido',
+                    observaciones: device.observaciones || device.observacion || 'Ninguna'
+                };
+                
+                return `
+                    <tr data-id="${device.id}">
+                        <td>${fields.serial}</td>
+                        <td>${fields.ip}</td>
+                        <td>${fields.ubicacion}</td>
+                        <td>${fields.activo_fijo}</td>
+                        <td><span class="status-badge ${statusClass}">${fields.estado}</span></td>
+                        <td>${fields.observaciones}</td>
+                        <td>
+                            <div class="action-buttons">
+                                <button class="btn-action btn-edit" onclick="InventoryApp.editDevice('${this.currentTable}', ${device.id})" title="Editar">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn-action btn-delete" onclick="InventoryApp.deleteDevice('${this.currentTable}', ${device.id})" title="Eliminar">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }
         }).join('');
     },
 
@@ -701,7 +771,7 @@ const InventoryApp = {
     },
 
     // ==============================================
-    // MÉTODOS DE EDICIÓN Y ELIMINACIÓN (sin cambios)
+    // MÉTODOS DE EDICIÓN Y ELIMINACIÓN
     // ==============================================
 
     editDevice: async function(tipo, id) {
@@ -835,8 +905,7 @@ const InventoryApp = {
             tablets: [
                 { name: 'ip', label: 'Dirección IP', type: 'text', required: true, placeholder: 'Ej: 192.168.1.80' },
                 { name: 'serial', label: 'Número de Serie', type: 'text', required: true, placeholder: 'Número de serie de la tablet' },
-                { name: 'activo_fijo', label: 'Activo Fijo', type: 'text', required: true, placeholder: 'Código de activo fijo' },
-                { name: 'no_maquina', label: 'Número de Máquina', type: 'text', required: false, placeholder: 'Número interno de máquina' }
+                { name: 'activo_fijo', label: 'Activo Fijo', type: 'text', required: true, placeholder: 'Código de activo fijo' }
             ],
             lectores_qr: [
                 { name: 'serial', label: 'Número de Serie', type: 'text', required: true, placeholder: 'Número de serie del lector QR' },
@@ -947,7 +1016,7 @@ const InventoryApp = {
     },
 
     // ==============================================
-    // MÉTODOS DE NOTIFICACIÓN (sin cambios)
+    // MÉTODOS DE NOTIFICACIÓN
     // ==============================================
 
     showNotification: function(message, type = 'info') {
@@ -994,7 +1063,7 @@ const InventoryApp = {
     },
 
     // ==============================================
-    // MÉTODOS AUXILIARES DE INTERFAZ (sin cambios)
+    // MÉTODOS AUXILIARES DE INTERFAZ
     // ==============================================
 
     showLoadingState: function(section) {
@@ -1030,7 +1099,7 @@ const InventoryApp = {
     },
 
     // ==============================================
-    // MÉTODOS DE NAVEGACIÓN (sin cambios)
+    // MÉTODOS DE NAVEGACIÓN
     // ==============================================
 
     switchDeviceTable: function(deviceType) {
@@ -1041,6 +1110,33 @@ const InventoryApp = {
         document.querySelectorAll('.device-type-btn').forEach(btn => {
             btn.classList.toggle('active', btn.id === `btn-${deviceType}`);
         });
+        
+        // Actualizar títulos primero
+        const tableHead = document.getElementById('devices-table-head');
+        if (tableHead) {
+            if (deviceType === 'readers') {
+                tableHead.innerHTML = `
+                    <th>Serial</th>
+                    <th>IP</th>
+                    <th>Ubicación</th>
+                    <th>No. Máquina</th>
+                    <th>Activo Fijo</th>
+                    <th>Estado</th>
+                    <th>Observaciones</th>
+                    <th>Acciones</th>
+                `;
+            } else {
+                tableHead.innerHTML = `
+                    <th>Serial</th>
+                    <th>IP</th>
+                    <th>Ubicación</th>
+                    <th>Activo Fijo</th>
+                    <th>Estado</th>
+                    <th>Observaciones</th>
+                    <th>Acciones</th>
+                `;
+            }
+        }
         
         if (this.currentData.devices[deviceType]) {
             this.updateDeviceTable(this.currentData.devices[deviceType]);
@@ -1068,7 +1164,7 @@ const InventoryApp = {
     },
 
     // ==============================================
-    // MÉTODOS DE UTILIDAD (sin cambios)
+    // MÉTODOS DE UTILIDAD
     // ==============================================
 
     getStatusClass: function(status) {
@@ -1109,7 +1205,7 @@ const InventoryApp = {
     },
 
     // ==============================================
-    // MÉTODOS DE MODALES (sin cambios)
+    // MÉTODOS DE MODALES
     // ==============================================
 
     closeModal: function(modalId) {
@@ -1161,7 +1257,7 @@ const InventoryApp = {
     },
 
     // ==============================================
-    // MÉTODOS DE USUARIO (sin cambios)
+    // MÉTODOS DE USUARIO
     // ==============================================
 
     loadUserData: async function() {
@@ -1205,7 +1301,7 @@ const InventoryApp = {
     },
 
     // ==============================================
-    // CONFIGURACIÓN DE EVENTOS (actualizada)
+    // CONFIGURACIÓN DE EVENTOS
     // ==============================================
 
     setupEventListeners: function() {
@@ -1256,19 +1352,19 @@ const InventoryApp = {
             }
         });
 
-            // Botón de refrescar página - NUEVO
-             const refreshPageBtn = document.getElementById('refreshPageBtn');
-            if (refreshPageBtn) {
-             refreshPageBtn.addEventListener('click', () => {
-            console.log('🔄 Refrescando página completa...');
-            this.showNotification('Refrescando página...', 'info');
-            
-            // Pequeño delay para que se vea la notificación
-            setTimeout(() => {
-                window.location.reload();
-            }, 500);
-        });
-    }
+        // Botón de refrescar página - NUEVO
+        const refreshPageBtn = document.getElementById('refreshPageBtn');
+        if (refreshPageBtn) {
+            refreshPageBtn.addEventListener('click', () => {
+                console.log('🔄 Refrescando página completa...');
+                this.showNotification('Refrescando página...', 'info');
+                
+                // Pequeño delay para que se vea la notificación
+                setTimeout(() => {
+                    window.location.reload();
+                }, 500);
+            });
+        }
         
         // Botones de actualización
         const refreshButtons = [

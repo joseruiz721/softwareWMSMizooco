@@ -606,22 +606,17 @@
                         </div>
                         
                         <div class="devices-table-container">
-                            <table class="devices-table">
-                                <thead>
-                                    <tr>
-                                        <th>Serial</th>
-                                        <th>IP</th>
-                                        <th>Ubicación</th>
-                                        <th>Activo Fijo</th>
-                                        <th>Estado</th>
-                                        <th>Observaciones</th>
-                                        <th>Acciones</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="devices-table-body">
-                                    <!-- Los datos se cargarán aquí dinámicamente -->
-                                </tbody>
-                            </table>
+                        <!-- En la sección de Dispositivos Mizooco, cambiar el thead de la tabla: -->
+<table class="devices-table">
+    <thead>
+        <tr id="devices-table-head">
+            <!-- Los títulos se cargarán dinámicamente desde JavaScript -->
+        </tr>
+    </thead>
+    <tbody id="devices-table-body">
+        <!-- Los datos se cargarán aquí dinámicamente -->
+    </tbody>
+</table>
                         </div>
                         
                         <div class="stats-charts">
