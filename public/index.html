@@ -2,11 +2,80 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <!-- VIEWPORT MEJORADO para móvil/tablet -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+    
+    <!-- CONFIGURACIÓN PWA PARA MÓVIL -->
+    <meta name="theme-color" content="#2563eb">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="msapplication-TileColor" content="#2563eb">
+    <meta name="msapplication-tap-highlight" content="no">
+    
     <title>Login - Gestion WMS</title>
+    
+    <!-- MANIFEST PARA PWA -->
+    <link rel="manifest" href="/manifest.json">
+    
+    <!-- ICONOS PARA MÓVILES -->
+   <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="/android-chrome-192x192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="/android-chrome-512x512.png">
+    
+    <!-- FONTS Y ESTILOS -->
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="css/login.css">
+    
+    <!-- ESTILOS RESPONSIVE INLINE (para problemas comunes) -->
+    <style>
+        /* Estilos responsivos críticos */
+        @media (max-width: 768px) {
+            body {
+                -webkit-text-size-adjust: 100%;
+                -webkit-tap-highlight-color: transparent;
+                touch-action: manipulation;
+            }
+            
+            /* Prevenir zoom en inputs en iOS */
+            input, select, textarea {
+                font-size: 16px !important;
+            }
+            
+            /* Mejorar área táctil */
+            button, a, input, .checkbox-container {
+                min-height: 44px;
+                min-width: 44px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            /* Ajustes específicos para móviles pequeños */
+            .login-container {
+                margin: 10px !important;
+                padding: 20px !important;
+                border-radius: 12px !important;
+            }
+            
+            .login-title {
+                font-size: 1.5rem !important;
+            }
+        }
+        
+        /* Soporte para orientación landscape */
+        @media (max-height: 500px) and (orientation: landscape) {
+            .login-container {
+                max-height: 90vh;
+                overflow-y: auto;
+                margin-top: 5vh;
+                margin-bottom: 5vh;
+            }
+        }
+    </style>
 </head>
 <body>
     <div class="background-animation">
@@ -29,7 +98,7 @@
             <div class="form-group">
                 <div class="input-container">
                     <i class="input-icon fas fa-envelope"></i>
-                    <input type="email" id="email" name="correo" placeholder=" " required autocomplete="email">
+                    <input type="email" id="email" name="correo" placeholder=" " required autocomplete="email" inputmode="email">
                     <label for="email" class="input-label">Correo electrónico</label>
                     <div class="input-underline"></div>
                 </div>
@@ -68,21 +137,42 @@
         
         <div class="login-footer">
             <p>¿No tienes una cuenta? <a href="/registro" id="registerLink" class="register-link">Crear cuenta</a></p>
-            
-   
+        </div>
     </div>
 
     <script src="js/utils.js"></script>
     <script src="js/login.js"></script>
     
+    <!-- DETECCIÓN DE DISPOSITIVO MÓVIL -->
     <script>
-        // 🔥 CORREGIDO: Eliminada toda la verificación de autenticación automática
-        // que causaba el bucle de redirección
+        // Detectar si es dispositivo móvil
+        const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
         
+        if (isMobileDevice || isTouchDevice) {
+            document.body.classList.add('mobile-device');
+            
+            // Optimizar para touch
+            document.addEventListener('touchstart', function() {}, { passive: true });
+            
+            // Prevenir zoom doble tap en iOS
+            let lastTouchEnd = 0;
+            document.addEventListener('touchend', function(event) {
+                const now = (new Date()).getTime();
+                if (now - lastTouchEnd <= 300) {
+                    event.preventDefault();
+                }
+                lastTouchEnd = now;
+            }, false);
+        }
+        
+        // Configuración de enlaces
         document.addEventListener('DOMContentLoaded', function() {
             console.log('✅ index.html cargado correctamente');
+            console.log('📱 Dispositivo móvil detectado:', isMobileDevice);
+            console.log('👆 Touch device detectado:', isTouchDevice);
             
-            // Solo configurar enlaces, sin verificaciones de autenticación
+            // Configurar enlaces
             const registerLink = document.getElementById('registerLink');
             if (registerLink) {
                 registerLink.addEventListener('click', function(e) {
@@ -92,26 +182,18 @@
                 });
             }
             
-            // Configurar enlace de registro de administradores
-            const adminRegisterLink = document.getElementById('adminRegisterLink');
-            if (adminRegisterLink) {
-                adminRegisterLink.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    console.log('👑 Accediendo a registro de administradores...');
-                    
-                    const adminSecret = prompt('🔐 Ingrese la clave secreta de administrador:');
-                    if (adminSecret) {
-                        sessionStorage.setItem('tempAdminSecret', adminSecret);
-                        window.location.href = '/admin-register';
+            // Mejorar experiencia en móvil para inputs
+            const inputs = document.querySelectorAll('input');
+            inputs.forEach(input => {
+                // Evitar zoom automático en iOS
+                input.addEventListener('focus', function() {
+                    if (isMobileDevice) {
+                        setTimeout(() => {
+                            this.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }, 300);
                     }
                 });
-            }
-            
-            // Mostrar sección de administradores
-            const adminSection = document.getElementById('adminAccessSection');
-            if (adminSection) {
-                adminSection.style.display = 'block';
-            }
+            });
             
             console.log('✅ Configuración de enlaces completada');
         });

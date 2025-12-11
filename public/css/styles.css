@@ -2785,13 +2785,13 @@ body {
 /* Solo el contenido de la celda Activo Fijo */
 .devices-table td:nth-child(4) {
     font-size: 1.2em;
-    font-weight: 600;
+    font-weight: 500;
 }
 
 /* Solo el contenido de la celda Estado (columna 5) */
-.devices-table td:nth-child(5) {
+.devices-table td:nth-child(4) {
     font-size: 1.2em;
-    font-weight: 600;
+    font-weight: 500;
 }
 
 
