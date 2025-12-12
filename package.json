@@ -13,7 +13,6 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "mobile:icons": "node scripts/generate-icons.js",
     "mobile:test": "node scripts/test-mobile.js",
-    "mobile:audit": "lighthouse http://localhost:3000 --view",
     "build:pwa": "node scripts/build-pwa.js",
     "deploy:mobile": "npm run mobile:icons && npm run build:pwa"
   },
@@ -29,7 +28,7 @@
   "description": "Sistema de gestión WMS con soporte para dispositivos móviles y tabletas",
   "dependencies": {
     "bcryptjs": "^3.0.3",
-    "compression": "^1.7.4",
+    "compression": "^1.8.1",
     "connect-pg-simple": "^10.0.0",
     "cors": "^2.8.5",
     "dotenv": "^16.6.1",
@@ -43,32 +42,13 @@
     "nodemailer": "^7.0.10",
     "pdfkit": "^0.17.2",
     "pg": "^8.16.0",
-    "sharp": "^0.33.0"
+    "sharp": "^0.33.5"
   },
   "devDependencies": {
     "nodemon": "^3.0.3"
   },
-  "browserslist": [
-    ">0.2%",
-    "not dead",
-    "not op_mini all",
-    "ios_saf >= 10",
-    "chrome >= 60",
-    "firefox >= 60",
-    "safari >= 10",
-    "edge >= 15",
-    "android >= 6"
-  ],
   "engines": {
-    "node": ">=14.0.0",
-    "npm": ">=6.0.0"
-  },
-  "pwa": {
-    "name": "Gestión WMS",
-    "short_name": "WMS Mobile",
-    "description": "Sistema de gestión de almacenes móvil",
-    "start_url": "/",
-    "display": "standalone",
-    "orientation": "portrait-primary"
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
   }
 }

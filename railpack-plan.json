@@ -1,0 +1,8 @@
+{
+  "build": {
+    "nodeVersion": "18"
+  },
+  "run": {
+    "command": "npm start"
+  }
+}
