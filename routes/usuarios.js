@@ -449,7 +449,7 @@ router.delete("/perfil", async (req, res) => {
 });
 
 // Obtener todos los usuarios (solo admin)
-router.get("/usuarios", authenticateToken, requireAdmin, async (req, res) => {
+router.get("/", authenticateToken, requireAdmin, async (req, res) => {
     try {
         const users = await queryAsync(
             "SELECT id, cedula, nombre, correo, role, estado, fecha_registro, fecha_suspension, fecha_expiracion_suspension, fecha_bloqueo FROM usuarios ORDER BY id"
@@ -475,6 +475,7 @@ router.get("/lista", authenticateToken, requireAdmin, async (req, res) => {
         const users = await queryAsync(
             "SELECT id, cedula, nombre, correo, role, estado, fecha_registro FROM usuarios ORDER BY nombre"
         );
+        console.log('📋 Lista de usuarios consultada:', users.map(u => ({id: u.id, nombre: u.nombre, estado: u.estado})));
         return res.json({ success: true, data: users });
     } catch (error) {
         console.error('❌ Error obteniendo lista simple de usuarios:', error.message);

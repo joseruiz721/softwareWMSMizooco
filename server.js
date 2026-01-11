@@ -8,6 +8,7 @@ const cors = require("cors");
 
 // Importar configuraciones y rutas
 const databaseConfig = require('./config/database');
+const { queryAsync } = require('./utils/queryAsync');
 const { 
     requireAuth, 
     authenticateToken, 
@@ -29,6 +30,20 @@ const dashboardRoutes = require('./routes/dashboard');
 // Importar rutas de horarios calendario y asistencias
 const horariosCalendarioRoutes = require('./routes/horariosCalendario');
 const asistenciasRoutes = require('./routes/asistencias');
+
+// Función para limpiar tokens de recuperación expirados
+async function cleanupExpiredResetTokens() {
+    try {
+        const result = await databaseConfig.queryAsync(
+            "DELETE FROM password_reset_tokens WHERE expires_at < NOW()"
+        );
+        if (result.length > 0) {
+            console.log(`🧹 Limpiados ${result.length} tokens de recuperación expirados`);
+        }
+    } catch (error) {
+        console.error('❌ Error limpiando tokens expirados:', error);
+    }
+}
 
 const app = express();
 
@@ -428,7 +443,7 @@ app.get('/api/usuarios/perfil', authenticateToken, async (req, res) => {
 app.put('/api/admin/usuarios/:id/estado', authenticateToken, requireAdmin, async (req, res) => {
     try {
         const { id } = req.params;
-        const { estado, motivo } = req.body;
+        const { estado, motivo, duracion_dias } = req.body;
 
         if (!estado || !['activo', 'bloqueado', 'suspendido'].includes(estado)) {
             return res.status(400).json({
@@ -444,7 +459,8 @@ app.put('/api/admin/usuarios/:id/estado', authenticateToken, requireAdmin, async
             });
         }
 
-        const userExists = await databaseConfig.queryAsync(
+        // Verificar que el usuario existe
+        const userExists = await queryAsync(
             "SELECT id, nombre, correo FROM usuarios WHERE id = $1", 
             [id]
         );
@@ -456,31 +472,67 @@ app.put('/api/admin/usuarios/:id/estado', authenticateToken, requireAdmin, async
             });
         }
 
-        await databaseConfig.queryAsync(
+        const usuario = userExists[0];
+        console.log(`🔧 Intentando actualizar usuario ${usuario.nombre} (${id}) a estado: ${estado}`);
+        
+        // Verificar estado ANTES de la actualización
+        const estadoAntes = await databaseConfig.queryAsync(
+            "SELECT estado FROM usuarios WHERE id = $1",
+            [id]
+        );
+        console.log(`📊 Estado ANTES: ${estadoAntes[0]?.estado}`);
+        console.log(`🔍 Query de verificación ANTES encontró ${estadoAntes.length} filas`);
+
+        // Actualización directa con la función de databaseConfig (maneja mejor UPDATE)
+        console.log(`🔄 Ejecutando UPDATE: UPDATE usuarios SET estado = '${estado}' WHERE id = ${id}`);
+        const updateResult = await databaseConfig.queryAsync(
             "UPDATE usuarios SET estado = $1 WHERE id = $2", 
             [estado, id]
         );
 
-        const usuario = userExists[0];
-        console.log(`🔐 Estado actualizado: Usuario ${usuario.nombre} (${id}) ahora está ${estado}`);
+        console.log(`✅ UPDATE ejecutado, resultado:`, updateResult);
+        console.log(`📊 Tipo de resultado:`, typeof updateResult, Array.isArray(updateResult) ? 'array' : 'no-array');
 
-        return res.json({
-            success: true,
-            message: `Estado actualizado a ${estado} correctamente.`,
-            user: {
-                id: usuario.id,
-                nombre: usuario.nombre,
-                correo: usuario.correo,
-                estado: estado
-            }
-        });
+        // Verificar estado DESPUÉS de la actualización
+        const estadoDespues = await databaseConfig.queryAsync(
+            "SELECT estado FROM usuarios WHERE id = $1",
+            [id]
+        );
+        console.log(`📊 Estado DESPUÉS: ${estadoDespues[0]?.estado}`);
+
+        if (estadoDespues[0]?.estado === estado) {
+            console.log(`🎉 ¡ÉXITO! Usuario ${usuario.nombre} (${id}) actualizado correctamente a ${estado}`);
+            
+            // Log de auditoría
+            await databaseConfig.queryAsync(
+                `INSERT INTO logs_auditoria (usuario_id, accion, tabla_afectada, registro_id, detalles, ip_address) 
+                 VALUES ($1, $2, $3, $4, $5, $6)`,
+                [req.user.id, 'UPDATE', 'usuarios', id, `Estado cambiado a ${estado}`, req.ip || req.connection.remoteAddress]
+            );
+
+            res.json({
+                success: true,
+                message: `Usuario ${usuario.nombre} ha sido ${estado === 'activo' ? 'activado' : estado === 'bloqueado' ? 'bloqueado' : 'suspendido'} correctamente.`,
+                usuario: {
+                    id: usuario.id,
+                    nombre: usuario.nombre,
+                    estado: estado
+                }
+            });
+        } else {
+            console.error(`❌ ¡FALLÓ! El estado no cambió. Estado esperado: ${estado}, Estado actual: ${estadoDespues[0]?.estado}`);
+            
+            res.status(500).json({
+                success: false,
+                message: "Error interno: La actualización no se guardó en la base de datos."
+            });
+        }
 
     } catch (error) {
-        console.error("❌ Error actualizando estado:", error);
-        return res.status(500).json({
+        console.error('❌ Error cambiando estado de usuario:', error);
+        res.status(500).json({
             success: false,
-            message: "Error al actualizar estado.",
-            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+            message: "Error interno del servidor."
         });
     }
 });
@@ -1016,7 +1068,10 @@ async function serveResetPasswordPage(req, res) {
     
     try {
         const rows = await databaseConfig.queryAsync(
-            "SELECT id, nombre, correo FROM usuarios WHERE reset_token = $1 AND reset_token_expires > NOW()",
+            `SELECT u.id, u.nombre, u.correo 
+             FROM password_reset_tokens prt 
+             JOIN usuarios u ON prt.user_id = u.id 
+             WHERE prt.token = $1 AND prt.expires_at > NOW() AND prt.used = false`,
             [token]
         );
 
@@ -1295,6 +1350,12 @@ app.listen(PORT, async () => {
     }
     
     validateConfig();
+    
+    // Limpiar tokens de recuperación expirados
+    await cleanupExpiredResetTokens();
+    
+    // Limpiar tokens expirados cada hora
+    setInterval(cleanupExpiredResetTokens, 60 * 60 * 1000);
     
     Logger.startup(PORT, process.env.NODE_ENV || 'development');
     console.log('🔐 Sistema de roles y autenticación activado');

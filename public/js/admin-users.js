@@ -28,25 +28,7 @@ class AdminUsersManager {
      */
 async checkAdminPermissions() {
     try {
-        // Opción 1: Usar endpoint de verificación de sesión
-        const response = await fetch('/api/auth-status', {
-            credentials: 'include'
-        });
-        
-        // Opción 2: Verificar usuario global si existe
-        // if (window.currentUser && window.currentUser.role === 'admin') {
-        //     this.isAdmin = true;
-        //     this.currentUser = window.currentUser;
-        //     console.log('✅ Usuario administrador detectado desde variable global:', this.currentUser.nombre);
-        //     return true;
-        // }
-        
-        if (!response.ok) {
-            console.log('👤 No se pudo verificar permisos, probablemente sesión no iniciada');
-            return false;
-        }
-        
-        const result = await response.json();
+        const result = await ApiService.request('/api/auth-status');
         
         if (result.success && result.user && result.user.role === 'admin') {
             this.isAdmin = true;
@@ -501,25 +483,7 @@ async loadUsers() {
     try {
         console.log('🔄 Cargando lista de usuarios...');
         
-        // Usar fetch con credenciales para incluir la cookie de sesión
-       const response = await fetch('/api/admin/usuarios/lista', {
-    method: 'GET',
-    credentials: 'include',
-    headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-    }
-});
-        
-        if (!response.ok) {
-            if (response.status === 401 || response.status === 403) {
-                this.showNotification('No autorizado. Por favor, inicie sesión nuevamente.', 'error');
-                return false;
-            }
-            throw new Error(`Error ${response.status}: ${response.statusText}`);
-        }
-        
-        const result = await response.json();
+        const result = await ApiService.request('/api/admin/usuarios/lista');
         
         if (result.success) {
             this.users = result.data;
@@ -552,6 +516,7 @@ async loadUsers() {
         const usuariosActivos = this.users.filter(u => u.estado === 'activo').length;
         const usuariosSuspendidos = this.users.filter(u => u.estado === 'suspendido').length;
         const usuariosBloqueados = this.users.filter(u => u.estado === 'bloqueado').length;
+        const usuariosEliminados = this.users.filter(u => u.estado === 'eliminado').length;
         const administradores = this.users.filter(u => u.role === 'admin').length;
         const usuariosNormales = this.users.filter(u => u.role === 'user').length;
 
@@ -606,7 +571,7 @@ async loadUsers() {
 
                     <div class="filter-buttons">
                         <button class="filter-btn ${this.currentFilter === 'todos' ? 'active' : ''}" onclick="window.adminUsersManager.filterUsers('todos')">
-                            <i class="fas fa-list"></i> Todos (${this.users.length})
+                            <i class="fas fa-list"></i> Todos (${this.users.filter(u => u.estado !== 'eliminado').length})
                         </button>
                         <button class="filter-btn ${this.currentFilter === 'activos' ? 'active' : ''}" onclick="window.adminUsersManager.filterUsers('activos')">
                             <i class="fas fa-check-circle"></i> Activos (${usuariosActivos})
@@ -616,6 +581,9 @@ async loadUsers() {
                         </button>
                         <button class="filter-btn ${this.currentFilter === 'bloqueados' ? 'active' : ''}" onclick="window.adminUsersManager.filterUsers('bloqueados')">
                             <i class="fas fa-ban"></i> Bloqueados (${usuariosBloqueados})
+                        </button>
+                        <button class="filter-btn ${this.currentFilter === 'eliminados' ? 'active' : ''}" onclick="window.adminUsersManager.filterUsers('eliminados')">
+                            <i class="fas fa-trash"></i> Eliminados (${usuariosEliminados})
                         </button>
                         <button class="filter-btn ${this.currentFilter === 'admins' ? 'active' : ''}" onclick="window.adminUsersManager.filterUsers('admins')">
                             <i class="fas fa-crown"></i> Admins (${administradores})
@@ -683,6 +651,8 @@ async loadUsers() {
     renderUsersTable() {
         const usersToShow = this.filteredUsers.length > 0 ? this.filteredUsers : this.users;
         
+        console.log('🎨 Renderizando tabla con usuarios:', usersToShow.map(u => ({id: u.id, nombre: u.nombre, estado: u.estado})));
+        
         if (usersToShow.length === 0) {
             return `
                 <tr>
@@ -694,7 +664,9 @@ async loadUsers() {
             `;
         }
 
-        return usersToShow.map(user => `
+        return usersToShow.map(user => {
+            console.log(`🎨 Renderizando usuario ${user.id}: ${user.nombre} - Estado: ${user.estado}`);
+            return `
             <tr data-user-id="${user.id}" class="${user.estado !== 'activo' ? 'user-inactive' : ''}">
                 <td>
                     <div class="user-info-cell">
@@ -723,7 +695,7 @@ async loadUsers() {
                     </div>
                 </td>
             </tr>
-        `).join('');
+        `;}).join('');
     }
 
     /**
@@ -788,6 +760,10 @@ async loadUsers() {
      */
     renderDeleteButton(user) {
         if (!user || !user.id) return '';
+
+        if (user.estado === 'eliminado') {
+            return '<span class="text-muted"><i class="fas fa-trash"></i> Eliminado</span>';
+        }
 
         if (user.id === this.currentUser?.id) {
             return '<button class="btn btn-sm btn-outline" disabled title="No puedes eliminarte a ti mismo"><i class="fas fa-trash"></i> Eliminar</button>';
@@ -905,20 +881,14 @@ getStatusClass(estado) {
     if (!confirmacion) return;
 
     try {
-        // ✅ RUTA CORRECTA: /api/admin/usuarios/:id/rol
-        const response = await fetch(`/api/admin/usuarios/${userId}/rol`, {
+        const result = await ApiService.request(`/api/admin/usuarios/${userId}/rol`, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
             body: JSON.stringify({ role: newRole })
         });
 
-        const result = await response.json();
-
         if (result.success) {
             this.showNotification(result.message, 'success');
-            await this.loadUsers();
-            this.showUsersModal();
+            await this.refreshUsersTable();
         } else {
             throw new Error(result.message || 'Error al cambiar rol');
         }
@@ -938,7 +908,7 @@ getStatusClass(estado) {
             return;
         }
 
-        const confirmacion = confirm(
+        let confirmacion = confirm(
             `¿Eliminar usuario "${user.nombre}"?\n\n` +
             `📧 Correo: ${user.correo}\n` +
             `👑 Rol: ${user.role === 'admin' ? 'Administrador' : 'Usuario'}\n` +
@@ -952,45 +922,42 @@ getStatusClass(estado) {
         );
 
         if (confirmacion) {
-            this.deleteUser(userId);
+            this.deleteUser(userId, false);
         }
     }
 
     /**
      * 🗑️ Eliminar usuario (marcado como eliminado)
      */
-async deleteUser(userId) {
-    console.log(`🗑️ Intentando eliminar usuario ID: ${userId}`);
+async deleteUser(userId, force = false) {
+    console.log(`🗑️ Intentando eliminar usuario ID: ${userId}, force: ${force}`);
     
     try {
-       const response = await fetch(`/api/admin/usuarios/${userId}`, {
-    method: 'DELETE',
-    headers: {
-        'Content-Type': 'application/json'
-    },
-    credentials: 'include'
-});
-
-        
-        if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(errorData.message || `Error ${response.status}: ${response.statusText}`);
-        }
-        
-        const result = await response.json();
+        const url = force ? `/api/admin/usuarios/${userId}?cascade=true` : `/api/admin/usuarios/${userId}`;
+        const result = await ApiService.request(url, {
+            method: 'DELETE'
+        });
         
         if (result.success) {
-            console.log('✅ Usuario eliminado:', result.data);
+            console.log('✅ Usuario eliminado:', result);
             this.showNotification('Usuario eliminado correctamente', 'success');
             
-            // Recargar la lista de usuarios
-            await this.loadUsers();
-            
-            // Actualizar la vista del modal
-            if (this.modalOpen) {
-                this.showUsersModal();
-            }
+            // Actualizar tabla sin recrear modal
+            await this.refreshUsersTable();
         } else {
+            // Si hay dependencias y no se forzó, preguntar si quiere forzar
+            if (result.message && result.message.includes('referencias en otras tablas') && !force) {
+                const forceConfirm = confirm(
+                    `El usuario tiene referencias en otras tablas que impiden su eliminación automática.\n\n` +
+                    `Detalles:\n${result.dependencies ? Object.entries(result.dependencies).filter(([k,v]) => v > 0).map(([k,v]) => `• ${k}: ${v}`).join('\n') : 'Ver logs del servidor'}\n\n` +
+                    `¿Desea FORZAR la eliminación? (Esto puede causar inconsistencias en los datos)`
+                );
+                if (forceConfirm) {
+                    return this.deleteUser(userId, true);
+                } else {
+                    return; // Cancelar
+                }
+            }
             throw new Error(result.message || 'Error al eliminar usuario');
         }
     } catch (error) {
@@ -1082,21 +1049,14 @@ async deleteUser(userId) {
     }
 
     try {
-        // ✅ RUTA CORRECTA: /api/admin/usuarios/:id/estado
-        const response = await fetch(`/api/admin/usuarios/${userId}/estado`, {
+        const result = await ApiService.request(`/api/admin/usuarios/${userId}/estado`, {
             method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            credentials: 'include',
             body: JSON.stringify({ 
                 estado: 'suspendido',
                 motivo: motivo.trim(), 
                 duracion_dias: parseInt(duracion_dias) 
             })
         });
-
-        const result = await response.json();
 
         if (result.success) {
             this.showNotification(`✅ ${result.message}`, 'success');
@@ -1105,11 +1065,8 @@ async deleteUser(userId) {
             const suspendModal = document.getElementById('suspendModal');
             if (suspendModal) suspendModal.remove();
             
-            // Recargar usuarios
-            await this.loadUsers();
-            
-            // Recargar el modal principal
-            if (this.modalOpen) this.showUsersModal();
+            // Actualizar tabla
+            await this.refreshUsersTable();
         } else {
             throw new Error(result.message || 'Error al suspender usuario');
         }
@@ -1148,20 +1105,14 @@ async deleteUser(userId) {
  
 async blockUser(userId) {
     try {
-        // ✅ RUTA CORRECTA: /api/admin/usuarios/:id/estado
-        const response = await fetch(`/api/admin/usuarios/${userId}/estado`, {
+        const result = await ApiService.request(`/api/admin/usuarios/${userId}/estado`, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
             body: JSON.stringify({ estado: 'bloqueado' })
         });
 
-        const result = await response.json();
-
         if (result.success) {
             this.showNotification(`🚫 ${result.message}`, 'success');
-            await this.loadUsers();
-            if (this.modalOpen) this.showUsersModal();
+            await this.refreshUsersTable();
         } else {
             throw new Error(result.message || 'Error al bloquear usuario');
         }
@@ -1187,20 +1138,17 @@ async blockUser(userId) {
     if (!confirmacion) return;
 
     try {
-        // ✅ RUTA CORRECTA: /api/admin/usuarios/:id/estado
-        const response = await fetch(`/api/admin/usuarios/${userId}/estado`, {
+        const result = await ApiService.request(`/api/admin/usuarios/${userId}/estado`, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
             body: JSON.stringify({ estado: 'activo' })
         });
 
-        const result = await response.json();
-
         if (result.success) {
+            console.log('✅ Respuesta del backend para activar:', result);
+            console.log('👤 Usuario antes de la operación:', this.users.find(u => u.id === parseInt(userId)));
             this.showNotification(`✅ ${result.message}`, 'success');
-            await this.loadUsers();
-            if (this.modalOpen) this.showUsersModal();
+            await this.refreshUsersTable();
+            console.log('👤 Usuario después de la operación:', this.users.find(u => u.id === parseInt(userId)));
         } else {
             throw new Error(result.message || 'Error al activar usuario');
         }
@@ -1211,8 +1159,80 @@ async blockUser(userId) {
 }
 
     /**
-     * 🔍 Configurar búsqueda
+     * � Actualizar tabla de usuarios (sin recrear modal)
      */
+    async refreshUsersTable() {
+        try {
+            console.log('🔄 Actualizando tabla de usuarios...');
+
+            // Recargar usuarios
+            const success = await this.loadUsers();
+            if (!success) return;
+
+            console.log(`📊 Usuarios cargados: ${this.users.length}`);
+            console.log(`🎯 Filtro actual: ${this.currentFilter}`);
+
+            // Aplicar filtro actual (esto ya actualiza tabla, estadísticas y event listeners)
+            this.filterUsers(this.currentFilter);
+
+            console.log(`📋 Usuarios filtrados: ${this.filteredUsers.length}`);
+            console.log('✅ Tabla de usuarios actualizada');
+
+        } catch (error) {
+            console.error('❌ Error actualizando tabla:', error);
+            this.showNotification('Error al actualizar tabla: ' + error.message, 'error');
+        }
+    }
+
+    /**
+     * 📊 Actualizar estadísticas del modal
+     */
+    updateModalStats() {
+        if (!this.modalOpen) return;
+        
+        const usuariosActivos = this.users.filter(u => u.estado === 'activo').length;
+        const usuariosSuspendidos = this.users.filter(u => u.estado === 'suspendido').length;
+        const usuariosBloqueados = this.users.filter(u => u.estado === 'bloqueado').length;
+        const usuariosEliminados = this.users.filter(u => u.estado === 'eliminado').length;
+        const administradores = this.users.filter(u => u.role === 'admin').length;
+        const usuariosNormales = this.users.filter(u => u.role === 'user').length;
+
+        // Actualizar contadores en los botones de filtro
+        const filterButtons = document.querySelectorAll('.filter-btn');
+        filterButtons.forEach(btn => {
+            const icon = btn.querySelector('i');
+            if (icon) {
+                if (icon.classList.contains('fa-list')) {
+                    // "Todos" excluyendo eliminados
+                    const totalActivos = this.users.filter(u => u.estado !== 'eliminado').length;
+                    btn.innerHTML = `<i class="fas fa-list"></i> Todos (${totalActivos})`;
+                } else if (icon.classList.contains('fa-check-circle')) {
+                    btn.innerHTML = `<i class="fas fa-check-circle"></i> Activos (${usuariosActivos})`;
+                } else if (icon.classList.contains('fa-pause-circle')) {
+                    btn.innerHTML = `<i class="fas fa-pause-circle"></i> Suspendidos (${usuariosSuspendidos})`;
+                } else if (icon.classList.contains('fa-ban')) {
+                    btn.innerHTML = `<i class="fas fa-ban"></i> Bloqueados (${usuariosBloqueados})`;
+                } else if (icon.classList.contains('fa-trash')) {
+                    btn.innerHTML = `<i class="fas fa-trash"></i> Eliminados (${usuariosEliminados})`;
+                } else if (icon.classList.contains('fa-crown')) {
+                    btn.innerHTML = `<i class="fas fa-crown"></i> Admins (${administradores})`;
+                } else if (icon.classList.contains('fa-user')) {
+                    btn.innerHTML = `<i class="fas fa-user"></i> Usuarios (${usuariosNormales})`;
+                }
+            }
+        });
+
+        // Actualizar estadísticas principales
+        const statCards = document.querySelectorAll('.admin-stat-value');
+        if (statCards.length >= 4) {
+            statCards[0].textContent = usuariosActivos;
+            statCards[1].textContent = usuariosSuspendidos;
+            statCards[2].textContent = usuariosBloqueados;
+            statCards[3].textContent = administradores;
+        }
+
+        console.log('✅ Estadísticas del modal actualizadas');
+    }
     setupSearch() {
         const searchInput = document.getElementById('usersSearchInput');
         if (searchInput) {
@@ -1268,8 +1288,11 @@ async blockUser(userId) {
      */
     filterUsers(filterType) {
         this.currentFilter = filterType;
-        
+
         switch(filterType) {
+            case 'todos':
+                this.filteredUsers = this.users.filter(u => u.estado !== 'eliminado');
+                break;
             case 'activos':
                 this.filteredUsers = this.users.filter(u => u.estado === 'activo');
                 break;
@@ -1279,6 +1302,9 @@ async blockUser(userId) {
             case 'bloqueados':
                 this.filteredUsers = this.users.filter(u => u.estado === 'bloqueado');
                 break;
+            case 'eliminados':
+                this.filteredUsers = this.users.filter(u => u.estado === 'eliminado');
+                break;
             case 'admins':
                 this.filteredUsers = this.users.filter(u => u.role === 'admin');
                 break;
@@ -1286,14 +1312,17 @@ async blockUser(userId) {
                 this.filteredUsers = this.users.filter(u => u.role === 'user');
                 break;
             default:
-                this.filteredUsers = [...this.users];
+                this.filteredUsers = this.users.filter(u => u.estado !== 'eliminado');
         }
         
         // Actualizar tabla
         const tbody = document.getElementById('usersTableBody');
         if (tbody) {
+            console.log('📋 Actualizando DOM de tabla...');
+            const oldHtml = tbody.innerHTML;
             tbody.innerHTML = this.renderUsersTable();
             this.attachTableEventListeners();
+            console.log('📋 DOM actualizado. HTML cambió:', oldHtml !== tbody.innerHTML);
         }
         
         // Actualizar botones de filtro
@@ -1304,6 +1333,9 @@ async blockUser(userId) {
                 btn.classList.remove('active');
             }
         });
+        
+        // Actualizar estadísticas del modal
+        this.updateModalStats();
     }
 
     /**
@@ -1311,11 +1343,8 @@ async blockUser(userId) {
      */
     async refreshUsers() {
         this.showNotification('Actualizando lista de usuarios...', 'info');
-        const success = await this.loadUsers();
-        if (success) {
-            this.showUsersModal();
-            this.showNotification('Lista de usuarios actualizada', 'success');
-        }
+        await this.refreshUsersTable();
+        this.showNotification('Lista de usuarios actualizada', 'success');
     }
 
     /**

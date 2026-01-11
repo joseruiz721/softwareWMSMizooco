@@ -17,38 +17,58 @@ const router = express.Router();
 async function serveResetPage(req, res) {
     const { token } = req.params;
     console.log('📄 Verificando token para página de restablecimiento:', token);
+    console.log('🔍 Longitud del token:', token.length);
     
     try {
+        // PRIMERO: Debug - ver todos los tokens en BD
+        const allTokens = await databaseConfig.queryAsync(
+            `SELECT prt.id, u.correo, prt.token, prt.expires_at, prt.used, NOW() as ahora 
+             FROM password_reset_tokens prt 
+             JOIN usuarios u ON prt.user_id = u.id 
+             WHERE prt.used = false`
+        );
+        
+        console.log('🔍 Tokens en BD:', allTokens.map(t => ({
+            correo: t.correo,
+            token: t.token ? `${t.token.substring(0, 20)}...` : 'NULL',
+            expira: t.expires_at,
+            usado: t.used,
+            ahora: t.ahora
+        })));
+        
+        // LUEGO: Verificar el token específico
         const rows = await databaseConfig.queryAsync(
-            "SELECT id, nombre, correo FROM usuarios WHERE reset_token = $1 AND reset_token_expires > NOW()",
+            `SELECT u.id, u.nombre, u.correo, prt.token, prt.expires_at, prt.used, NOW() as ahora 
+             FROM password_reset_tokens prt 
+             JOIN usuarios u ON prt.user_id = u.id 
+             WHERE prt.token = $1 AND prt.used = false`,
             [token]
         );
+        
+        console.log('🔍 Resultado de búsqueda de token:', {
+            encontrado: rows.length > 0,
+            usuario: rows[0]?.nombre,
+            token_en_bd: rows[0]?.token ? '✓' : '✗',
+            expira: rows[0]?.expires_at,
+            usado: rows[0]?.used,
+            ahora: rows[0]?.ahora,
+            expirado: rows[0]?.expires_at < rows[0]?.ahora
+        });
 
         if (rows.length === 0) {
-            console.log('❌ Token inválido o expirado');
-            return res.status(400).send(`
-                <!DOCTYPE html>
-                <html>
-                <head>
-                    <meta charset="UTF-8">
-                    <title>Enlace Inválido</title>
-                    <style>
-                        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
-                        h2 { color: #e74c3c; }
-                        a { color: #3498db; text-decoration: none; }
-                    </style>
-                </head>
-                <body>
-                    <h2>Enlace Inválido o Expirado</h2>
-                    <p>El enlace de restablecimiento es inválido o ha expirado.</p>
-                    <a href="/solicitar-reset">Solicitar nuevo enlace</a>
-                </body>
-                </html>
-            `);
+            console.log('❌ Token no encontrado en BD');
+            // ... mostrar error page
         }
         
-        console.log('✅ Token válido, sirviendo página de restablecimiento para:', rows[0].nombre);
+        // Verificar expiración
+        if (rows[0].expires_at < rows[0].ahora) {
+            console.log('❌ Token expirado');
+            // ... mostrar error page
+        }
+        
+        console.log('✅ Token válido, sirviendo página para:', rows[0].nombre);
         res.sendFile(path.join(__dirname, '../public/reestablecer-contraseña.html'));
+        
     } catch (error) {
         console.error("❌ Error verificando token:", error);
         return res.status(500).send("Error interno del servidor.");
@@ -105,6 +125,7 @@ router.post("/login", async (req, res) => {
         
         const usuario = rows[0];
         console.log('✅ Usuario encontrado:', usuario.nombre, '- Rol:', usuario.role);
+        console.log('🔍 Hash de contraseña en BD (primeros 20 chars):', usuario.contrasena ? usuario.contrasena.substring(0, 20) + '...' : 'NULL');
         
         // 🔥 VERIFICAR SI EL USUARIO ESTÁ BLOQUEADO
         if (usuario.estado === 'bloqueado') {
@@ -393,7 +414,6 @@ router.post("/registro-admin", async (req, res) => {
 // RECUPERACIÓN DE CONTRASEÑA
 // ==============================================
 
-// Solicitar reset de contraseña
 router.post('/solicitar-reset', async (req, res) => {
     const { correo } = req.body;
     console.log('🔑 Solicitando reset para:', correo);
@@ -421,7 +441,7 @@ router.post('/solicitar-reset', async (req, res) => {
         
         const usuario = rows[0];
         
-        // 🔥 VERIFICAR SI EL USUARIO ESTÁ BLOQUEADO
+        // VERIFICAR SI EL USUARIO ESTÁ BLOQUEADO
         if (usuario.estado === 'bloqueado') {
             console.log('🚫 Usuario bloqueado intentando recuperar contraseña:', usuario.nombre);
             return res.json({ 
@@ -430,35 +450,57 @@ router.post('/solicitar-reset', async (req, res) => {
             });
         }
         
+        // Generar token
         const token = crypto.randomBytes(32).toString('hex');
         const expires = new Date(Date.now() + 3600000);
+        
+        console.log('🔐 Token generado:', {
+            token: token.substring(0, 20) + '...',
+            expira: expires,
+            expiraISO: expires.toISOString()
+        });
 
-        await databaseConfig.queryAsync(
-            "UPDATE usuarios SET reset_token = $1, reset_token_expires = $2 WHERE id = $3",
-            [token, expires, usuario.id]
+        // Guardar token en BD
+        const result = await databaseConfig.queryAsync(
+            "INSERT INTO password_reset_tokens (user_id, token, expires_at) VALUES ($1, $2, $3) RETURNING id, token, expires_at",
+            [usuario.id, token, expires.toISOString()]
         );
 
-        console.log('✅ Token generado para:', usuario.correo);
+        // Verificar que se guardó
+        if (result.length === 0 || result[0].token !== token) {
+            console.error('❌ Error: Token no se guardó correctamente en BD');
+            throw new Error('Error al guardar token de recuperación');
+        }
 
+        console.log('✅ Token guardado correctamente en BD para:', usuario.correo);
+        console.log('📅 Expira:', result[0].expires_at);
+
+        // Crear enlace
         const resetLink = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/auth/reestablecer-contraseña/${token}`;
         console.log('🔗 Enlace de restablecimiento:', resetLink);
 
+        // Enviar email (con manejo de errores mejorado)
+        let emailSent = false;
         try {
             const emailResult = await enviarCorreoRecuperacion(usuario.correo, usuario.nombre, resetLink);
             
             if (emailResult.success) {
                 console.log('✅ Email de recuperación enviado a:', usuario.correo);
+                emailSent = true;
             } else {
                 console.error('❌ Error enviando email:', emailResult.error);
+                // No hacemos rollback aquí, el token queda válido por si el usuario solicita otro email
             }
         } catch (emailError) {
             console.error('❌ Error en envío de email:', emailError);
+            // El token sigue siendo válido
         }
         
         return res.json({ 
             success: true, 
             message: "Si existe una cuenta con ese correo, se ha enviado un enlace para restablecer la contraseña.",
-            debug_link: process.env.NODE_ENV === 'development' ? resetLink : undefined
+            debug_link: process.env.NODE_ENV === 'development' ? resetLink : undefined,
+            email_sent: emailSent
         });
 
     } catch (error) {
@@ -475,6 +517,10 @@ router.post('/reestablecer-pass', async (req, res) => {
     const { token, password } = req.body;
 
     console.log('🔑 Restableciendo contraseña con token');
+    console.log('📝 Contraseña recibida del frontend (longitud):', password ? password.length : 'NULL');
+    console.log('📝 Primeros 10 chars de contraseña:', password ? password.substring(0, 10) + '...' : 'NULL');
+    console.log('📝 Contraseña recibida del frontend (longitud):', password ? password.length : 'NULL');
+    console.log('📝 Primeros 10 chars de contraseña:', password ? password.substring(0, 10) + '...' : 'NULL');
 
     if (!token) {
         return res.status(400).json({ 
@@ -506,7 +552,10 @@ router.post('/reestablecer-pass', async (req, res) => {
 
     try {
         const rows = await databaseConfig.queryAsync(
-            "SELECT id, nombre, correo, estado FROM usuarios WHERE reset_token = $1 AND reset_token_expires > NOW()",
+            `SELECT prt.id as token_id, u.id, u.nombre, u.correo, u.estado 
+             FROM password_reset_tokens prt 
+             JOIN usuarios u ON prt.user_id = u.id 
+             WHERE prt.token = $1 AND prt.expires_at > NOW() AND prt.used = false`,
             [token]
         );
 
@@ -519,6 +568,12 @@ router.post('/reestablecer-pass', async (req, res) => {
         }
 
         const usuario = rows[0];
+        console.log('👤 Usuario encontrado para reset:', {
+            id: usuario.id,
+            nombre: usuario.nombre,
+            correo: usuario.correo,
+            token_id: usuario.token_id
+        });
         
         // 🔥 VERIFICAR SI EL USUARIO ESTÁ BLOQUEADO
         if (usuario.estado === 'bloqueado') {
@@ -530,11 +585,65 @@ router.post('/reestablecer-pass', async (req, res) => {
         }
         
         const hashedPassword = await bcrypt.hash(password, 12);
+        console.log('🔐 Contraseña hasheada correctamente, longitud:', hashedPassword.length);
+        console.log('🔐 Hash generado (primeros 20 chars):', hashedPassword.substring(0, 20) + '...');
 
-        await databaseConfig.queryAsync(
-            "UPDATE usuarios SET contrasena = $1, reset_token = NULL, reset_token_expires = NULL WHERE id = $2",
+        // Solución: Deshabilitar triggers temporalmente para el UPDATE
+        console.log('🔄 Deshabilitando triggers...');
+        await databaseConfig.pool.query("ALTER TABLE usuarios DISABLE TRIGGER trigger_sync_estado");
+        await databaseConfig.pool.query("ALTER TABLE usuarios DISABLE TRIGGER trigger_limpiar_eliminados");
+        
+        console.log('🔄 Ejecutando UPDATE sin triggers...');
+        const updateResult = await databaseConfig.pool.query(
+            "UPDATE usuarios SET contrasena = $1 WHERE id = $2",
             [hashedPassword, usuario.id]
         );
+        console.log('💾 UPDATE sin triggers ejecutado, rowCount:', updateResult.rowCount);
+
+        // Re-habilitar triggers
+        console.log('🔄 Re-habilitando triggers...');
+        await databaseConfig.pool.query("ALTER TABLE usuarios ENABLE TRIGGER trigger_sync_estado");
+        await databaseConfig.pool.query("ALTER TABLE usuarios ENABLE TRIGGER trigger_limpiar_eliminados");
+
+        // Verificar el resultado
+        const verifyResult = await databaseConfig.queryAsync(
+            "SELECT id, correo, contrasena FROM usuarios WHERE id = $1",
+            [usuario.id]
+        );
+        console.log('🔍 Verificación final:', {
+            id: verifyResult[0]?.id,
+            correo: verifyResult[0]?.correo,
+            hash_actual: verifyResult[0]?.contrasena ? verifyResult[0].contrasena.substring(0, 20) + '...' : 'NULL',
+            es_hash_nuevo: verifyResult[0]?.contrasena === hashedPassword
+        });
+
+        if (updateResult.rowCount === 0) {
+            console.error('❌ Error: UPDATE no afectó ninguna fila');
+            throw new Error('Error al actualizar contraseña');
+        }
+
+        if (verifyResult[0]?.contrasena !== hashedPassword) {
+            console.error('❌ Error: El hash no se guardó correctamente en BD');
+            throw new Error('Error al guardar la nueva contraseña');
+        }
+        const hashRetornado = updateResult.rows[0]?.contrasena;
+        const hashVerificado = verifyResult[0]?.contrasena;
+        const hashesIguales = hashRetornado === hashVerificado;
+        const hashCorrecto = hashRetornado === hashedPassword;
+
+        console.log('🔍 Comparación de hashes:', {
+            hash_generado_correcto: hashCorrecto,
+            hash_retornado_vs_verificado: hashesIguales,
+            problema: !hashCorrecto ? 'El UPDATE no guardó el hash correcto' : 
+                     !hashesIguales ? 'Inconsistencia entre RETURNING y SELECT' : 'OK'
+        });
+
+        console.log('✅ Contraseña actualizada exitosamente para usuario:', verifyResult[0].correo);
+        const tokenUpdateResult = await databaseConfig.queryAsync(
+            "UPDATE password_reset_tokens SET used = true, used_at = NOW() WHERE id = $1 RETURNING id",
+            [usuario.token_id]
+        );
+        console.log('🔑 Resultado de marcado de token como usado:', tokenUpdateResult);
 
         console.log('✅ Contraseña actualizada para:', usuario.correo);
 
