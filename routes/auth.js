@@ -476,8 +476,10 @@ router.post('/solicitar-reset', async (req, res) => {
         console.log('📅 Expira:', result[0].expires_at);
 
         // Crear enlace
-        const resetLink = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/auth/reestablecer-contraseña/${token}`;
+        const baseUrl = process.env.FRONTEND_URL || process.env.RAILWAY_STATIC_URL || 'http://localhost:3000';
+        const resetLink = `${baseUrl}/auth/reestablecer-contraseña/${token}`;
         console.log('🔗 Enlace de restablecimiento:', resetLink);
+        console.log('🔗 Enlace en email:', resetLink);
 
         // Enviar email (con manejo de errores mejorado)
         let emailSent = false;
