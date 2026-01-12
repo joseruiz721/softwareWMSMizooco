@@ -425,7 +425,7 @@ app.get('/api/usuarios/perfil', authenticateToken, async (req, res) => {
         
         res.json({
             success: true,
-            user: userData[0]
+            data: userData[0]
         });
     } catch (error) {
         Logger.error('Error obteniendo perfil de usuario', {
@@ -1017,8 +1017,9 @@ app.get("/admin-register", requireAuth, requireAdmin, (req, res) => {
 });
 
 // Rutas protegidas - TODOS LOS USUARIOS AUTENTICADOS PUEDEN ACCEDER
-app.get("/dashboard", requireAuth, (req, res) => {
-    Logger.auth('Acceso al dashboard', req.session.user.nombre, true);
+app.get("/dashboard", (req, res) => {
+    // La página se carga sin verificar autenticación inicialmente
+    // JavaScript se encargará de verificar la autenticación y redirigir si es necesario
     res.sendFile(path.join(__dirname, "public", "paginaPrincipal.html"));
 });
 

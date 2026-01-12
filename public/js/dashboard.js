@@ -70,12 +70,45 @@ const DashboardApp = {
     // Inicialización
     // --------------------------
     init: function() {
+        this.checkAuthentication();
         this.loadUserData();
         this.loadDashboardStats();
         this.setupEventListeners();
         this.setupSearch();
         this.hideAllSections();
         this.showMainDashboard();
+    },
+
+    // Verificar autenticación al cargar la página
+    checkAuthentication: async function() {
+        try {
+            // Intentar verificar el estado de autenticación
+            if (typeof ApiService !== 'undefined') {
+                const authStatus = await ApiService.request('/auth/auth-status');
+                if (!authStatus.authenticated) {
+                    console.log('❌ Usuario no autenticado, redirigiendo al login...');
+                    window.location.href = '/';
+                    return;
+                }
+                console.log('✅ Usuario autenticado:', authStatus.user.nombre);
+            } else {
+                // Fallback: verificar con fetch
+                const response = await fetch('/auth/auth-status', {
+                    credentials: 'include'
+                });
+                const authStatus = await response.json();
+                if (!authStatus.authenticated) {
+                    console.log('❌ Usuario no autenticado, redirigiendo al login...');
+                    window.location.href = '/';
+                    return;
+                }
+                console.log('✅ Usuario autenticado:', authStatus.user.nombre);
+            }
+        } catch (error) {
+            console.error('Error verificando autenticación:', error);
+            // Si hay error, redirigir al login
+            window.location.href = '/';
+        }
     },
 
     // --------------------------
@@ -131,11 +164,18 @@ const DashboardApp = {
     
     loadDashboardStats: async function() {
         try {
-            const response = await fetch('/api/dashboard/stats');
-            if (!response.ok) throw new Error('Error al cargar estadísticas');
+            // Usar ApiService si está disponible para incluir el token JWT
+            let data;
+            if (typeof ApiService !== 'undefined') {
+                data = await ApiService.request('/api/dashboard/stats');
+            } else {
+                // Fallback a fetch directo
+                const response = await fetch('/api/dashboard/stats');
+                if (!response.ok) throw new Error('Error al cargar estadísticas');
+                data = await response.json();
+            }
             
-            const stats = await response.json();
-            this.updateStatsUI(stats);
+            this.updateStatsUI(data);
             
         } catch (error) {
             console.error('Error al cargar estadísticas:', error);
@@ -664,13 +704,18 @@ updateDeviceTable: function(devices) {
     // --------------------------
     loadUserData: async function() {
         try {
-            const response = await fetch('/api/usuarios/perfil', {
-                credentials: 'include'
-            });
-            
-            if (!response.ok) throw new Error('Error en la respuesta del servidor');
-            
-            const data = await response.json();
+            // Usar ApiService si está disponible para incluir el token JWT
+            let data;
+            if (typeof ApiService !== 'undefined') {
+                data = await ApiService.request('/api/usuarios/perfil');
+            } else {
+                // Fallback a fetch directo
+                const response = await fetch('/api/usuarios/perfil', {
+                    credentials: 'include'
+                });
+                if (!response.ok) throw new Error('Error en la respuesta del servidor');
+                data = await response.json();
+            }
             
             if (data.success) {
                 this.currentUser = data.data;

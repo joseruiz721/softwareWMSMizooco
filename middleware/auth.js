@@ -7,6 +7,7 @@ const Logger = require('../config/logger');
 function requireAuth(req, res, next) {
     Logger.debug('🔐 Verificando autenticación para: ' + req.path);
     
+    // Primero verificar si hay sesión activa
     if (req.session && req.session.user) {
         // 🔥 VERIFICAR SI EL USUARIO ESTÁ BLOQUEADO
         if (req.session.user.estado === 'bloqueado') {
@@ -30,22 +31,71 @@ function requireAuth(req, res, next) {
             return res.redirect('/?error=account_blocked');
         }
         
-        Logger.info('✅ Usuario autenticado: ' + req.session.user.nombre);
+        Logger.info('✅ Usuario autenticado via sesión: ' + req.session.user.nombre);
         next();
     } else {
-        Logger.warn('❌ Usuario no autenticado, redirigiendo...');
+        // Si no hay sesión, verificar token JWT
+        const authHeader = req.headers['authorization'];
+        const token = authHeader && authHeader.split(' ')[1];
         
-        // Si es una petición API, devolver error JSON
-        if (req.path.startsWith('/api/')) {
-            return res.status(401).json({
-                success: false,
-                message: "No autorizado. Por favor, inicia sesión."
-            });
+        if (token) {
+            try {
+                const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret');
+                // Verificar que el usuario existe y no está bloqueado
+                databaseConfig.queryAsync(
+                    'SELECT id, cedula, nombre, correo, role, estado FROM usuarios WHERE id = $1',
+                    [decoded.userId]
+                ).then(userQuery => {
+                    if (userQuery.length > 0) {
+                        const usuario = userQuery[0];
+                        
+                        // Verificar si está bloqueado
+                        if (usuario.estado === 'bloqueado') {
+                            Logger.warn(`🚫 Usuario bloqueado intentando acceder con JWT: ${usuario.nombre}`);
+                            if (req.path.startsWith('/api/')) {
+                                return res.status(403).json({
+                                    success: false,
+                                    message: "Tu cuenta ha sido bloqueada. Contacta al administrador.",
+                                    error: "ACCOUNT_BLOCKED"
+                                });
+                            }
+                            return res.redirect('/?error=account_blocked');
+                        }
+                        
+                        // Usuario válido, crear sesión temporal para compatibilidad
+                        req.session.user = usuario;
+                        req.session.userId = usuario.id;
+                        
+                        Logger.info('✅ Usuario autenticado via JWT: ' + usuario.nombre);
+                        next();
+                    } else {
+                        Logger.warn('❌ Usuario no encontrado para token JWT');
+                        redirectToLogin(req, res);
+                    }
+                }).catch(error => {
+                    Logger.error('❌ Error verificando usuario JWT:', error);
+                    redirectToLogin(req, res);
+                });
+            } catch (error) {
+                Logger.debug('🟡 Token JWT inválido en requireAuth');
+                redirectToLogin(req, res);
+            }
+        } else {
+            Logger.warn('❌ No hay sesión ni token JWT, redirigiendo...');
+            redirectToLogin(req, res);
         }
-        
-        // Si es una ruta de página, redirigir al login
-        res.redirect('/');
     }
+}
+
+// Función auxiliar para redirigir al login
+function redirectToLogin(req, res) {
+    if (req.path.startsWith('/api/')) {
+        return res.status(401).json({
+            success: false,
+            message: "No autorizado. Por favor, inicia sesión."
+        });
+    }
+    res.redirect('/');
 }
 
 function optionalAuth(req, res, next) {
